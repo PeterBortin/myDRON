@@ -4,249 +4,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>myFPV</title>
+    <title>myDRON</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
         * { margin:0; padding:0; user-select:none; -webkit-user-select:none; touch-action:none; box-sizing:border-box; }
         body { background:#000; font-family:'Share Tech Mono',monospace; overflow:hidden; }
         canvas { display:block; }
-
-```
-    #scanlines {
-        position:fixed; top:0; left:0; width:100%; height:100%;
-        background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.15) 2px,rgba(0,0,0,0.15) 4px);
-        pointer-events:none; z-index:50; mix-blend-mode:multiply;
-    }
-    #vignette {
-        position:fixed; top:0; left:0; width:100%; height:100%;
-        background:radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.85) 100%);
-        pointer-events:none; z-index:51;
-    }
-    #chromatic {
-        position:fixed; top:0; left:0; width:100%; height:100%;
-        pointer-events:none; z-index:49; mix-blend-mode:screen;
-        background:transparent; transition:opacity 0.1s; opacity:0;
-    }
-    #chromatic.active { opacity:1; background:linear-gradient(90deg,rgba(255,0,0,0.05) 0%,transparent 25%,transparent 75%,rgba(0,80,255,0.05) 100%); }
-
-    /* LEFT OSD */
-    #osd-left {
-        position:absolute; top:20px; left:80px;
-        color:#39ff14; font-family:'Share Tech Mono',monospace; font-size:11px;
-        pointer-events:none; z-index:60; line-height:1.7;
-        background:linear-gradient(135deg,rgba(0,20,0,0.72),rgba(0,40,0,0.45));
-        border:1px solid rgba(57,255,20,0.3); border-left:3px solid #39ff14;
-        padding:12px 14px; min-width:170px;
-        clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%);
-    }
-    #osd-left::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,#39ff14,transparent); }
-    .hud-label { color:rgba(57,255,20,0.5); font-size:9px; letter-spacing:2px; text-transform:uppercase; }
-    #mission-info { margin-top:10px; border-top:1px solid rgba(57,255,20,0.2); padding-top:8px; }
-    .mission-target { color:#ff4444; text-shadow:0 0 8px #ff4444; }
-    .mission-dist  { color:#ffff00; text-shadow:0 0 6px #ffff00; }
-    #god-status { margin-top:8px; color:#ff6600; font-size:9px; letter-spacing:1px; animation:blink 2s infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-    /* MINIMAP */
-    #osd-right {
-        position: absolute; margin:30px; top:20px; right:20px;
-        width:130px; height:130px; border-radius:50%; overflow:hidden;
-        border:2px solid rgba(57,255,20,0.4);
-        box-shadow:0 0 20px rgba(57,255,20,0.3),inset 0 0 30px rgba(0,0,0,0.8);
-        background:rgba(0,8,0,0.85); pointer-events:none; z-index:60;
-    }
-    #minimap-container { position:relative; width:100%; height:100%; }
-    #minimap-canvas { width:100%; height:100%; }
-    #minimap-arrow {
-        position:absolute; top:50%; left:50%;
-        width:0; height:0;
-        border-left:5px solid transparent; border-right:5px solid transparent;
-        border-bottom:12px solid #39ff14;
-        filter:drop-shadow(0 0 4px #39ff14);
-        transform:translate(-50%,-50%); z-index:6;
-    }
-    #minimap-sweep {
-        position:absolute; top:0; left:0; width:100%; height:100%; border-radius:50%;
-        background:conic-gradient(from 0deg,rgba(57,255,20,0.18) 0deg,transparent 60deg,transparent 360deg);
-        animation:sweep 3s linear infinite;
-    }
-    @keyframes sweep { to { transform:rotate(360deg); } }
-
-    /* HEADING TAPE */
-    #heading-tape {
-        position:absolute; top:20px; left:50%; transform:translateX(-50%);
-        width:230px; height:30px; overflow:hidden;
-        border:1px solid rgba(57,255,20,0.3);
-        background:rgba(0,15,0,0.68); backdrop-filter:blur(4px);
-        z-index:60; pointer-events:none;
-    }
-    #heading-inner {
-        font-family:'Share Tech Mono',monospace; font-size:10px;
-        color:rgba(57,255,20,0.6); display:flex; align-items:center;
-        height:100%; padding:0 10px; justify-content:space-between; letter-spacing:2px;
-    }
-    #heading-deg { color:#39ff14; font-size:14px; font-weight:bold; text-shadow:0 0 10px #39ff14; }
-
-    /* ALT TAPE -- far right */
-    #alt-tape {
-        position:absolute; right:10px; top:50%; transform:translateY(-50%);
-        width:55px; height:230px;
-        border:1px solid rgba(57,255,20,0.35);
-        background:rgba(0,12,0,0.75); overflow:hidden;
-        z-index:60; pointer-events:none;
-        display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
-        clip-path:polygon(0 8px,8px 0,100% 0,100% 100%,0 100%);
-    }
-    #alt-tape::after { content:''; position:absolute; left:4px; right:4px; top:50%; height:1px; background:rgba(57,255,20,0.45); }
-    #alt-big { font-size:19px; color:#39ff14; text-shadow:0 0 14px #39ff14; font-family:'Orbitron',monospace; font-weight:700; }
-    #alt-unit { font-size:8px; color:rgba(57,255,20,0.5); letter-spacing:2px; }
-    .tape-tick { width:100%; display:flex; align-items:center; justify-content:flex-end; padding-right:5px; gap:3px; }
-    .tick-line  { height:1px; background:rgba(57,255,20,0.3); }
-    .tick-num   { font-size:7px; color:rgba(57,255,20,0.4); }
-
-    /* SPD TAPE -- far left */
-    #spd-tape {
-        position:absolute; left:10px; top:50%; transform:translateY(-50%);
-        width:55px; height:230px;
-        border:1px solid rgba(0,255,255,0.35);
-        background:rgba(0,10,15,0.75); overflow:hidden;
-        z-index:60; pointer-events:none;
-        display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
-        clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,0 100%);
-    }
-    #spd-tape::after { content:''; position:absolute; left:4px; right:4px; top:50%; height:1px; background:rgba(0,255,255,0.45); }
-    #spd-big { font-size:19px; color:#00ffff; text-shadow:0 0 14px #00ffff; font-family:'Orbitron',monospace; font-weight:700; }
-    #spd-unit { font-size:8px; color:rgba(0,255,255,0.5); letter-spacing:2px; }
-    .tick-line-c { height:1px; background:rgba(0,255,255,0.3); }
-    .tick-num-c  { font-size:7px; color:rgba(0,255,255,0.4); }
-
-    /* TARGET LOCK */
-    #target-ui {
-        position:absolute; width:80px; height:80px;
-        display:none; transform:translate(-50%,-50%);
-        pointer-events:none; z-index:60;
-    }
-    #target-inner {
-        width:100%; height:100%;
-        border:1.5px solid rgba(255,40,40,0.9); border-radius:2px;
-        position:relative; animation:lock-pulse 1s infinite;
-    }
-    #target-ui.priority #target-inner { border-color:rgba(255,255,0,0.95); animation:lock-pulse-yellow 0.6s infinite; }
-    @keyframes lock-pulse {
-        0%,100%{box-shadow:0 0 8px rgba(255,40,40,0.5),inset 0 0 8px rgba(255,40,40,0.1);}
-        50%{box-shadow:0 0 20px rgba(255,40,40,0.8),inset 0 0 15px rgba(255,40,40,0.2);}
-    }
-    @keyframes lock-pulse-yellow {
-        0%,100%{box-shadow:0 0 10px rgba(255,255,0,0.6),inset 0 0 10px rgba(255,255,0,0.15);}
-        50%{box-shadow:0 0 28px rgba(255,255,0,0.9),inset 0 0 20px rgba(255,255,0,0.25);}
-    }
-    .corner { position:absolute; width:12px; height:12px; border-color:inherit; border-style:solid; }
-    .tl{top:-1px;left:-1px;border-width:2px 0 0 2px;}
-    .tr{top:-1px;right:-1px;border-width:2px 2px 0 0;}
-    .bl{bottom:-1px;left:-1px;border-width:0 0 2px 2px;}
-    .br{bottom:-1px;right:-1px;border-width:0 2px 2px 0;}
-    #target-label { position:absolute; top:-20px; left:50%; transform:translateX(-50%); font-family:'Share Tech Mono',monospace; color:inherit; font-size:9px; white-space:nowrap; letter-spacing:2px; text-shadow:0 0 8px currentColor; }
-    #target-dist  { position:absolute; bottom:-18px; left:50%; transform:translateX(-50%); color:#fff; font-size:9px; background:rgba(255,40,40,0.6); padding:1px 5px; letter-spacing:1px; }
-    .priority #target-dist { background:rgba(255,200,0,0.7); color:#000; }
-
-    /* CROSSHAIR */
-    #crosshair {
-        position:absolute; top:50%; left:50%; width:50px; height:50px;
-        transform:translate(-50%,-50%); pointer-events:none; z-index:60;
-    }
-    .ch-h,.ch-v { position:absolute; background:rgba(57,255,20,0.55); }
-    .ch-h { width:20px; height:1px; top:50%; }
-    .ch-h.left{right:60%;} .ch-h.right{left:60%;}
-    .ch-v { height:20px; width:1px; left:50%; }
-    .ch-v.top{bottom:60%;} .ch-v.bottom{top:60%;}
-    .ch-dot { position:absolute; width:3px; height:3px; background:rgba(57,255,20,0.9); top:50%; left:50%; transform:translate(-50%,-50%); border-radius:50%; box-shadow:0 0 6px #39ff14; }
-
-    /* JOYSTICKS */
-    #joystick-left,#joystick-right { position:absolute; bottom:10%; width:140px; height:140px; z-index:20; opacity:0.55; }
-    #joystick-left{left:5%;} #joystick-right{right:5%;}
-
-    /* BOTTOM HUD */
-    #bottom-hud {
-        position:absolute; bottom:30px; left:50%; transform:translateX(-50%);
-        display:flex; gap:10px; align-items:center; z-index:60; pointer-events:none;
-    }
-    .status-pill {
-        font-family:'Share Tech Mono',monospace; font-size:9px;
-        padding:4px 10px; letter-spacing:2px;
-        border:1px solid currentColor; color:rgba(57,255,20,0.7);
-        background:rgba(0,20,0,0.6);
-    }
-    .status-pill.warn { color:#ff4444; animation:blink 0.8s infinite; }
-    .status-pill.hot  { color:#ff9900; }
-    .status-pill.blue { color:#00ffff; }
-
-    /* MISSILE WARNING */
-    #missile-warning {
-        position:fixed; top:0; left:0; width:100%; height:100%;
-        pointer-events:none; z-index:80; display:none;
-        border:4px solid transparent;
-        animation:mw-flash 0.35s 4;
-    }
-    @keyframes mw-flash {
-        0%,100%{border-color:rgba(255,0,255,0);box-shadow:none;}
-        50%{border-color:rgba(255,0,255,0.85);box-shadow:inset 0 0 80px rgba(200,0,255,0.2);}
-    }
-
-    /* RESTART */
-    #restart-screen { position:fixed; top:0; left:0; width:100%; height:100%; display:none; z-index:1000; background:rgba(0,0,0,0.92); align-items:center; justify-content:center; }
-    .screen-content {
-        text-align:center; font-family:'Orbitron',monospace; padding:50px 60px;
-        border:2px solid #ff1a1a;
-        background:linear-gradient(135deg,rgba(20,0,0,0.9),rgba(40,0,0,0.7));
-        clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px));
-        box-shadow:0 0 40px rgba(255,26,26,0.4),inset 0 0 30px rgba(255,0,0,0.05);
-    }
-    #res-msg { font-size:42px; color:#ff1a1a; text-shadow:0 0 30px #ff1a1a,0 0 60px #ff0000; font-weight:900; margin-bottom:10px; }
-    #res-sub { font-size:11px; color:rgba(255,80,80,0.7); letter-spacing:4px; margin-bottom:30px; }
-    .screen-content button { background:transparent; color:#ff1a1a; border:1px solid #ff1a1a; padding:14px 35px; font-family:'Orbitron',monospace; cursor:pointer; font-size:13px; letter-spacing:4px; transition:all 0.2s; }
-    .screen-content button:hover { background:#ff1a1a; color:#000; box-shadow:0 0 20px #ff1a1a; }
-    .success { border-color:#39ff14!important; background:linear-gradient(135deg,rgba(0,20,0,0.9),rgba(0,40,0,0.7))!important; box-shadow:0 0 40px rgba(57,255,20,0.4),inset 0 0 30px rgba(57,255,20,0.05)!important; }
-    .success #res-msg { color:#39ff14!important; text-shadow:0 0 30px #39ff14,0 0 60px #00ff00!important; }
-    .success button { color:#39ff14!important; border-color:#39ff14!important; }
-    .success button:hover { background:#39ff14!important; color:#000!important; }
-
-    /* STATIC */
-    #static-noise { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; display:none; z-index:900; animation:static-flicker 0.06s infinite; }
-    @keyframes static-flicker {
-        0%  { opacity:0.35; filter:brightness(1.5) contrast(2); }
-        50% { opacity:0.65; filter:brightness(2.2) contrast(3) hue-rotate(20deg); }
-        100%{ opacity:0.2;  filter:brightness(1) contrast(1.5); }
-    }
-
-    /* START SCREEN */
-    #start-prompt { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.97); z-index:2000; display:flex; justify-content:center; align-items:center; }
-    .start-box {
-        text-align:center; padding:60px;
-        border:2px solid rgba(57,255,20,0.6);
-        background:linear-gradient(135deg,rgba(0,15,0,0.9),rgba(0,30,0,0.6));
-        clip-path:polygon(0 0,calc(100% - 25px) 0,100% 25px,100% 100%,25px 100%,0 calc(100% - 25px));
-        box-shadow:0 0 60px rgba(57,255,20,0.3),inset 0 0 40px rgba(57,255,20,0.05);
-    }
-    .start-title { font-family:'Orbitron',monospace; font-size:52px; font-weight:900; color:#39ff14; text-shadow:0 0 30px #39ff14,0 0 60px #00ff00; letter-spacing:8px; margin-bottom:8px; }
-    .start-sub   { font-family:'Share Tech Mono',monospace; color:rgba(57,255,20,0.5); font-size:11px; letter-spacing:4px; margin-bottom:40px; }
-    .start-btn   { background:transparent; color:#39ff14; border:1px solid #39ff14; padding:16px 45px; font-family:'Orbitron',monospace; cursor:pointer; font-size:14px; letter-spacing:6px; font-weight:700; transition:all 0.3s; }
-    .start-btn:hover { background:#39ff14; color:#000; box-shadow:0 0 30px #39ff14; }
-    .start-specs { margin-top:30px; font-size:9px; color:rgba(57,255,20,0.35); letter-spacing:2px; line-height:2.2; }
-</style>
-```
-
+        #scanlines { position:fixed; top:0; left:0; width:100%; height:100%; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.15) 2px,rgba(0,0,0,0.15) 4px); pointer-events:none; z-index:50; mix-blend-mode:multiply; }
+        #vignette { position:fixed; top:0; left:0; width:100%; height:100%; background:radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.85) 100%); pointer-events:none; z-index:51; }
+        #chromatic { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:49; mix-blend-mode:screen; background:transparent; transition:opacity 0.1s; opacity:0; }
+        #chromatic.active { opacity:1; background:linear-gradient(90deg,rgba(255,0,0,0.05) 0%,transparent 25%,transparent 75%,rgba(0,80,255,0.05) 100%); }
+        #osd-left { position:absolute; top:20px; left:80px; color:#39ff14; font-family:'Share Tech Mono',monospace; font-size:11px; pointer-events:none; z-index:60; line-height:1.7; background:linear-gradient(135deg,rgba(0,20,0,0.72),rgba(0,40,0,0.45)); border:1px solid rgba(57,255,20,0.3); border-left:3px solid #39ff14; padding:12px 14px; min-width:170px; clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%); }
+        #osd-left::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,#39ff14,transparent); }
+        .hud-label { color:rgba(57,255,20,0.5); font-size:9px; letter-spacing:2px; text-transform:uppercase; }
+        #mission-info { margin-top:10px; border-top:1px solid rgba(57,255,20,0.2); padding-top:8px; }
+        .mission-target { color:#ff4444; text-shadow:0 0 8px #ff4444; }
+        .mission-dist { color:#ffff00; text-shadow:0 0 6px #ffff00; }
+        #god-status { margin-top:8px; color:#ff6600; font-size:9px; letter-spacing:1px; animation:blink 2s infinite; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        #osd-right { position:absolute; margin:30px; top:20px; right:20px; width:130px; height:130px; border-radius:50%; overflow:hidden; border:2px solid rgba(57,255,20,0.4); box-shadow:0 0 20px rgba(57,255,20,0.3),inset 0 0 30px rgba(0,0,0,0.8); background:rgba(0,8,0,0.85); pointer-events:none; z-index:60; }
+        #minimap-container { position:relative; width:100%; height:100%; }
+        #minimap-canvas { width:100%; height:100%; }
+        #minimap-arrow { position:absolute; top:50%; left:50%; width:0; height:0; border-left:5px solid transparent; border-right:5px solid transparent; border-bottom:12px solid #39ff14; filter:drop-shadow(0 0 4px #39ff14); transform:translate(-50%,-50%); z-index:6; }
+        #minimap-sweep { position:absolute; top:0; left:0; width:100%; height:100%; border-radius:50%; background:conic-gradient(from 0deg,rgba(57,255,20,0.18) 0deg,transparent 60deg,transparent 360deg); animation:sweep 3s linear infinite; }
+        @keyframes sweep { to { transform:rotate(360deg); } }
+        #heading-tape { position:absolute; top:20px; left:50%; transform:translateX(-50%); width:230px; height:30px; overflow:hidden; border:1px solid rgba(57,255,20,0.3); background:rgba(0,15,0,0.68); backdrop-filter:blur(4px); z-index:60; pointer-events:none; }
+        #heading-inner { font-family:'Share Tech Mono',monospace; font-size:10px; color:rgba(57,255,20,0.6); display:flex; align-items:center; height:100%; padding:0 10px; justify-content:space-between; letter-spacing:2px; }
+        #heading-deg { color:#39ff14; font-size:14px; font-weight:bold; text-shadow:0 0 10px #39ff14; }
+        #alt-tape { position:absolute; right:10px; top:50%; transform:translateY(-50%); width:55px; height:230px; border:1px solid rgba(57,255,20,0.35); background:rgba(0,12,0,0.75); overflow:hidden; z-index:60; pointer-events:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; clip-path:polygon(0 8px,8px 0,100% 0,100% 100%,0 100%); }
+        #alt-tape::after { content:''; position:absolute; left:4px; right:4px; top:50%; height:1px; background:rgba(57,255,20,0.45); }
+        #alt-big { font-size:19px; color:#39ff14; text-shadow:0 0 14px #39ff14; font-family:'Orbitron',monospace; font-weight:700; }
+        #alt-unit { font-size:8px; color:rgba(57,255,20,0.5); letter-spacing:2px; }
+        .tape-tick { width:100%; display:flex; align-items:center; justify-content:flex-end; padding-right:5px; gap:3px; }
+        .tick-line { height:1px; background:rgba(57,255,20,0.3); }
+        .tick-num { font-size:7px; color:rgba(57,255,20,0.4); }
+        #spd-tape { position:absolute; left:10px; top:50%; transform:translateY(-50%); width:55px; height:230px; border:1px solid rgba(0,255,255,0.35); background:rgba(0,10,15,0.75); overflow:hidden; z-index:60; pointer-events:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,0 100%); }
+        #spd-tape::after { content:''; position:absolute; left:4px; right:4px; top:50%; height:1px; background:rgba(0,255,255,0.45); }
+        #spd-big { font-size:19px; color:#00ffff; text-shadow:0 0 14px #00ffff; font-family:'Orbitron',monospace; font-weight:700; }
+        #spd-unit { font-size:8px; color:rgba(0,255,255,0.5); letter-spacing:2px; }
+        .tick-line-c { height:1px; background:rgba(0,255,255,0.3); }
+        .tick-num-c { font-size:7px; color:rgba(0,255,255,0.4); }
+        #target-ui { position:absolute; width:80px; height:80px; display:none; transform:translate(-50%,-50%); pointer-events:none; z-index:60; }
+        #target-inner { width:100%; height:100%; border:1.5px solid rgba(255,40,40,0.9); border-radius:2px; position:relative; animation:lock-pulse 1s infinite; }
+        #target-ui.priority #target-inner { border-color:rgba(255,255,0,0.95); animation:lock-pulse-yellow 0.6s infinite; }
+        @keyframes lock-pulse { 0%,100%{box-shadow:0 0 8px rgba(255,40,40,0.5),inset 0 0 8px rgba(255,40,40,0.1);} 50%{box-shadow:0 0 20px rgba(255,40,40,0.8),inset 0 0 15px rgba(255,40,40,0.2);} }
+        @keyframes lock-pulse-yellow { 0%,100%{box-shadow:0 0 10px rgba(255,255,0,0.6),inset 0 0 10px rgba(255,255,0,0.15);} 50%{box-shadow:0 0 28px rgba(255,255,0,0.9),inset 0 0 20px rgba(255,255,0,0.25);} }
+        .corner { position:absolute; width:12px; height:12px; border-color:inherit; border-style:solid; }
+        .tl{top:-1px;left:-1px;border-width:2px 0 0 2px;} .tr{top:-1px;right:-1px;border-width:2px 2px 0 0;} .bl{bottom:-1px;left:-1px;border-width:0 0 2px 2px;} .br{bottom:-1px;right:-1px;border-width:0 2px 2px 0;}
+        #target-label { position:absolute; top:-20px; left:50%; transform:translateX(-50%); font-family:'Share Tech Mono',monospace; color:inherit; font-size:9px; white-space:nowrap; letter-spacing:2px; text-shadow:0 0 8px currentColor; }
+        #target-dist { position:absolute; bottom:-18px; left:50%; transform:translateX(-50%); color:#fff; font-size:9px; background:rgba(255,40,40,0.6); padding:1px 5px; letter-spacing:1px; }
+        .priority #target-dist { background:rgba(255,200,0,0.7); color:#000; }
+        #crosshair { position:absolute; top:50%; left:50%; width:50px; height:50px; transform:translate(-50%,-50%); pointer-events:none; z-index:60; }
+        .ch-h,.ch-v { position:absolute; background:rgba(57,255,20,0.55); }
+        .ch-h { width:20px; height:1px; top:50%; } .ch-h.left{right:60%;} .ch-h.right{left:60%;}
+        .ch-v { height:20px; width:1px; left:50%; } .ch-v.top{bottom:60%;} .ch-v.bottom{top:60%;}
+        .ch-dot { position:absolute; width:3px; height:3px; background:rgba(57,255,20,0.9); top:50%; left:50%; transform:translate(-50%,-50%); border-radius:50%; box-shadow:0 0 6px #39ff14; }
+        #joystick-left,#joystick-right { position:absolute; bottom:10%; width:140px; height:140px; z-index:20; opacity:0.55; }
+        #joystick-left{left:5%;} #joystick-right{right:5%;}
+        #bottom-hud { position:absolute; bottom:30px; left:50%; transform:translateX(-50%); display:flex; gap:10px; align-items:center; z-index:60; pointer-events:none; }
+        .status-pill { font-family:'Share Tech Mono',monospace; font-size:9px; padding:4px 10px; letter-spacing:2px; border:1px solid currentColor; color:rgba(57,255,20,0.7); background:rgba(0,20,0,0.6); }
+        .status-pill.warn { color:#ff4444; animation:blink 0.8s infinite; }
+        .status-pill.hot { color:#ff9900; }
+        .status-pill.blue { color:#00ffff; }
+        .status-pill.purple { color:#ff00ff; }
+        #missile-warning { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:80; display:none; border:4px solid transparent; animation:mw-flash 0.35s 4; }
+        @keyframes mw-flash { 0%,100%{border-color:rgba(255,0,255,0);box-shadow:none;} 50%{border-color:rgba(255,0,255,0.85);box-shadow:inset 0 0 80px rgba(200,0,255,0.2);} }
+        #restart-screen { position:fixed; top:0; left:0; width:100%; height:100%; display:none; z-index:1000; background:rgba(0,0,0,0.92); align-items:center; justify-content:center; }
+        .screen-content { text-align:center; font-family:'Orbitron',monospace; padding:50px 60px; border:2px solid #ff1a1a; background:linear-gradient(135deg,rgba(20,0,0,0.9),rgba(40,0,0,0.7)); clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px)); box-shadow:0 0 40px rgba(255,26,26,0.4),inset 0 0 30px rgba(255,0,0,0.05); }
+        #res-msg { font-size:42px; color:#ff1a1a; text-shadow:0 0 30px #ff1a1a,0 0 60px #ff0000; font-weight:900; margin-bottom:10px; }
+        #res-sub { font-size:11px; color:rgba(255,80,80,0.7); letter-spacing:4px; margin-bottom:30px; }
+        .screen-content button { background:transparent; color:#ff1a1a; border:1px solid #ff1a1a; padding:14px 35px; font-family:'Orbitron',monospace; cursor:pointer; font-size:13px; letter-spacing:4px; transition:all 0.2s; }
+        .screen-content button:hover { background:#ff1a1a; color:#000; box-shadow:0 0 20px #ff1a1a; }
+        .success { border-color:#39ff14!important; background:linear-gradient(135deg,rgba(0,20,0,0.9),rgba(0,40,0,0.7))!important; box-shadow:0 0 40px rgba(57,255,20,0.4),inset 0 0 30px rgba(57,255,20,0.05)!important; }
+        .success #res-msg { color:#39ff14!important; text-shadow:0 0 30px #39ff14,0 0 60px #00ff00!important; }
+        .success button { color:#39ff14!important; border-color:#39ff14!important; }
+        .success button:hover { background:#39ff14!important; color:#000!important; }
+        #static-noise { position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; display:none; z-index:900; animation:static-flicker 0.06s infinite; }
+        @keyframes static-flicker { 0%{opacity:0.35;filter:brightness(1.5) contrast(2);} 50%{opacity:0.65;filter:brightness(2.2) contrast(3) hue-rotate(20deg);} 100%{opacity:0.2;filter:brightness(1) contrast(1.5);} }
+        #start-prompt { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.97); z-index:2000; display:flex; justify-content:center; align-items:center; }
+        .start-box { text-align:center; padding:60px; border:2px solid rgba(57,255,20,0.6); background:linear-gradient(135deg,rgba(0,15,0,0.9),rgba(0,30,0,0.6)); clip-path:polygon(0 0,calc(100% - 25px) 0,100% 25px,100% 100%,25px 100%,0 calc(100% - 25px)); box-shadow:0 0 60px rgba(57,255,20,0.3),inset 0 0 40px rgba(57,255,20,0.05); }
+        .start-title { font-family:'Orbitron',monospace; font-size:52px; font-weight:900; color:#39ff14; text-shadow:0 0 30px #39ff14,0 0 60px #00ff00; letter-spacing:8px; margin-bottom:8px; }
+        .start-sub { font-family:'Share Tech Mono',monospace; color:rgba(57,255,20,0.5); font-size:11px; letter-spacing:4px; margin-bottom:40px; }
+        .start-btn { background:transparent; color:#39ff14; border:1px solid #39ff14; padding:16px 45px; font-family:'Orbitron',monospace; cursor:pointer; font-size:14px; letter-spacing:6px; font-weight:700; transition:all 0.3s; }
+        .start-btn:hover { background:#39ff14; color:#000; box-shadow:0 0 30px #39ff14; }
+        .start-specs { margin-top:30px; font-size:9px; color:rgba(57,255,20,0.35); letter-spacing:2px; line-height:2.2; }
+    </style>
 </head>
 <body>
 
 <div id="start-prompt">
     <div class="start-box">
-        <div class="start-title">myFPV</div>
+        <div class="start-title">myDRON</div>
         <div class="start-sub">FPV-Drone</div>
         <button class="start-btn" onclick="initAudio();document.getElementById('start-prompt').style.display='none'">ВЗЛЕТАЕМ</button>
         <div class="start-specs">
             ЛЕВЫЙ СТИК: ТЯГА / ПОВОРОТ<br>
             ПРАВЫЙ СТИК: НАПРАВЛЕНИЕ<br>
-            АВТОМОБИЛИ: АКТИВНЫ · БМ: УГРОЗА АКТИВНА
+            ВРАЖЕСКИЕ ДРОНЫ · ТРАНШЕИ · БМ: УГРОЗА АКТИВНА
         </div>
     </div>
 </div>
@@ -261,7 +115,7 @@
     <div id="mission-info">
         <div class="hud-label">OBJECTIVE</div>
         <div class="mission-target" id="obj-type">ПОИСК...</div>
-        <div class="mission-dist"  id="obj-dist">DST: ---</div>
+        <div class="mission-dist" id="obj-dist">DST: ---</div>
     </div>
     <div id="god-status">⬡ Attack Mode</div>
 </div>
@@ -272,8 +126,6 @@
     </div>
 </div>
 
-<!-- ALT far right -->
-
 <div id="alt-tape">
     <div class="tape-tick"><div class="tick-line" style="width:16px"></div><span class="tick-num" id="alt-t2">--</span></div>
     <div style="height:10px"></div>
@@ -282,8 +134,6 @@
     <div style="height:10px"></div>
     <div class="tape-tick"><div class="tick-line" style="width:10px"></div><span class="tick-num" id="alt-t1">--</span></div>
 </div>
-
-<!-- SPD far left -->
 
 <div id="spd-tape">
     <div style="display:flex;align-items:center;justify-content:flex-start;padding-left:5px;gap:3px;width:100%">
@@ -323,9 +173,10 @@
 
 <div id="bottom-hud">
     <div class="status-pill" id="pill-sys">SYS: ONLINE</div>
-    <div class="status-pill hot"  id="pill-threat">THREAT: HIGH</div>
+    <div class="status-pill hot" id="pill-threat">THREAT: HIGH</div>
     <div class="status-pill blue" id="pill-bm">BM: CLEAR</div>
-    <div class="status-pill"      id="pill-gps">GPS: LOCK</div>
+    <div class="status-pill purple" id="pill-uav">UAV: 0</div>
+    <div class="status-pill" id="pill-gps">GPS: LOCK</div>
 </div>
 
 <div id="joystick-left"></div>
@@ -350,10 +201,10 @@ const PHYSICS={ acceleration:90, friction:0.97, rotationSpeed:3.8, tiltMax:0.75,
 const CHUNK_SIZE=300, TRACER_SPEED=240;
 
 const scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2(0x000a00, 0.006);
-const camera=new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1500);
+scene.fog=new THREE.FogExp2(0x000a00,0.006);
+const camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,1500);
 const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth, innerHeight);
+renderer.setSize(innerWidth,innerHeight);
 renderer.setClearColor(0x010a01,1);
 document.body.appendChild(renderer.domElement);
 
@@ -361,7 +212,7 @@ const clock=new THREE.Clock();
 let isGameOver=false, isStaticActive=false, currentMissionTarget=null;
 
 const droneState={
-    pos:new THREE.Vector3((Math.random()-.5)*2000, 60, (Math.random()-.5)*2000),
+    pos:new THREE.Vector3((Math.random()-.5)*2000,60,(Math.random()-.5)*2000),
     vel:new THREE.Vector3(), rotY:Math.random()*Math.PI*2, tiltX:0, tiltZ:0
 };
 
@@ -373,7 +224,6 @@ let trailLine;
 
 // ─── AUDIO ───────────────────────────────────────────
 let audioCtx, droneOsc, droneOsc2, droneGain;
-
 function initAudio(){
     try{
         audioCtx=new (window.AudioContext||window.webkitAudioContext)();
@@ -391,18 +241,15 @@ function initAudio(){
     }catch(e){}
 }
 
-// Layered gunshot: sharp crack + white-noise body
 function playGunshot(vol=0.07){
     if(!audioCtx) return;
     const t=audioCtx.currentTime;
-    // crack
     const o=audioCtx.createOscillator(), g=audioCtx.createGain();
     o.type='square';
     o.frequency.setValueAtTime(240+Math.random()*100,t);
     o.frequency.exponentialRampToValueAtTime(35,t+0.1);
     g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.13);
     o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t+0.14);
-    // noise body
     const frames=Math.floor(audioCtx.sampleRate*0.09);
     const buf=audioCtx.createBuffer(1,frames,audioCtx.sampleRate);
     const d=buf.getChannelData(0);
@@ -414,17 +261,14 @@ function playGunshot(vol=0.07){
     src.start(t); src.stop(t+0.1);
 }
 
-// Realistic explosion: sub thump + rumble noise + optional big layer
 function playExplosion(big=false){
     if(!audioCtx) return;
     const t=audioCtx.currentTime, vol=big?0.75:0.45;
-    // Sub thump
     const o=audioCtx.createOscillator(), gt=audioCtx.createGain();
     o.type='sine';
     o.frequency.setValueAtTime(65,t); o.frequency.exponentialRampToValueAtTime(18,t+0.4);
     gt.gain.setValueAtTime(vol,t); gt.gain.exponentialRampToValueAtTime(0.001,t+0.42);
     o.connect(gt); gt.connect(audioCtx.destination); o.start(t); o.stop(t+0.44);
-    // Rumble noise
     const dur=big?2.8:1.3;
     const frames=Math.floor(audioCtx.sampleRate*dur);
     const buf=audioCtx.createBuffer(1,frames,audioCtx.sampleRate);
@@ -436,7 +280,6 @@ function playExplosion(big=false){
     gn.gain.setValueAtTime(vol*0.85,t); gn.gain.exponentialRampToValueAtTime(0.001,t+dur);
     src.buffer=buf; src.connect(lpf); lpf.connect(gn); gn.connect(audioCtx.destination);
     src.start(t); src.stop(t+dur);
-    // High snap (big only)
     if(big){
         const o2=audioCtx.createOscillator(), g2=audioCtx.createGain();
         o2.type='sawtooth';
@@ -446,7 +289,6 @@ function playExplosion(big=false){
     }
 }
 
-// Missile: descending whistle that grows louder
 function playMissileWhistle(dur=5){
     if(!audioCtx) return;
     const t=audioCtx.currentTime;
@@ -461,7 +303,6 @@ function playMissileWhistle(dur=5){
     const lpf=audioCtx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=3500;
     o.connect(lpf); lpf.connect(g); g.connect(audioCtx.destination);
     o.start(t); o.stop(t+dur+0.1);
-    // add white noise rushing component
     const nframes=Math.floor(audioCtx.sampleRate*dur);
     const nbuf=audioCtx.createBuffer(1,nframes,audioCtx.sampleRate);
     const nd=nbuf.getChannelData(0);
@@ -473,23 +314,19 @@ function playMissileWhistle(dur=5){
     nsrc.start(t); nsrc.stop(t+dur+0.05);
 }
 
-// ─── PARTICLES ───────────────────────────────────────
-function createExplosion(pos, color=0xff5500, count=45, big=false){
+// ─── PARTICLES / EXPLOSION ───────────────────────────
+function createExplosion(pos,color=0xff5500,count=45,big=false){
     playExplosion(big);
     const R=big?22:9;
-    // Flash + secondary
     [[R,0xffffcc,0.95,0.12,true],[R*1.7,0xff8800,0.6,0.22,true]].forEach(([r,col,op,life,f])=>{
         const m=new THREE.Mesh(new THREE.SphereGeometry(r,8,8),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:op}));
         m.position.copy(pos); scene.add(m); particles.push({mesh:m,vel:new THREE.Vector3(),life,isFlash:f});
     });
-    // Shockwave ring (big only)
     if(big){
-        const rg=new THREE.TorusGeometry(1,0.6,4,24);
-        const rm=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.75});
-        const ring=new THREE.Mesh(rg,rm); ring.position.copy(pos); ring.rotation.x=Math.PI/2;
+        const ring=new THREE.Mesh(new THREE.TorusGeometry(1,0.6,4,24),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.75}));
+        ring.position.copy(pos); ring.rotation.x=Math.PI/2;
         scene.add(ring); particles.push({mesh:ring,vel:new THREE.Vector3(),life:0.65,isRing:true});
     }
-    // Debris
     const shapes=[new THREE.BoxGeometry(.4,.4,.4),new THREE.TetrahedronGeometry(.5),new THREE.BoxGeometry(.2,1,.2)];
     for(let i=0;i<count;i++){
         const geo=shapes[i%3];
@@ -501,7 +338,6 @@ function createExplosion(pos, color=0xff5500, count=45, big=false){
         particles.push({mesh:p,vel,life:0.6+Math.random()*(big?2.2:1)});
         scene.add(p);
     }
-    // Smoke
     for(let i=0;i<(big?20:8);i++){
         const p=new THREE.Mesh(new THREE.SphereGeometry(.7+Math.random()*(big?3.5:1.8),6,6),
             new THREE.MeshBasicMaterial({color:big?0x333333:0x1a1a1a,transparent:true,opacity:.45}));
@@ -518,6 +354,7 @@ function getTerrainHeight(x,z){
           +Math.tanh(Math.sin(x*.004)*5)*40
           +Math.sin(x*.06)*Math.cos(z*.06)*4;
 }
+
 function createGround(){
     const geo=new THREE.PlaneGeometry(10000,10000,220,220);
     geo.rotateX(-Math.PI/2);
@@ -529,7 +366,7 @@ function createGround(){
     scene.add(m);
 }
 
-// ─── DRONE ───────────────────────────────────────────
+// ─── DRONE (player) ──────────────────────────────────
 function createDetailedDrone(){
     droneGroup=new THREE.Group();
     const mat=new THREE.MeshBasicMaterial({color:0x00ff44,wireframe:true});
@@ -581,14 +418,19 @@ function updateMinimap(){
     [20,42].forEach(r=>{mCtx.strokeStyle='rgba(57,255,20,0.1)';mCtx.beginPath();mCtx.arc(cx,cy,r,0,Math.PI*2);mCtx.stroke();});
     staticObstacles.forEach(o=>{
         const dx=(o.position.x-droneState.pos.x)*sc,dz=(o.position.z-droneState.pos.z)*sc;
-        if(Math.abs(dx)<62&&Math.abs(dz)<62){mCtx.fillStyle='rgba(0,170,0,0.2)';mCtx.fillRect(cx+dx-2,cy+dz-2,4,4);}
+        if(Math.abs(dx)<62&&Math.abs(dz)<62){mCtx.fillStyle='rgba(0,200,0,0.25)';mCtx.fillRect(cx+dx-2,cy+dz-2,4,4);}
     });
     entities.forEach(en=>{
         const dx=(en.mesh.position.x-droneState.pos.x)*sc,dz=(en.mesh.position.z-droneState.pos.z)*sc;
         if(Math.abs(dx)<62&&Math.abs(dz)<62){
-            const col=en===currentMissionTarget?'#ffff00':en.type==='car'?(en.side==='hostile'?'#ff9900':'#00aaff'):en.side==='hostile'?'#ff3030':'#00ffff';
+            let col;
+            if(en===currentMissionTarget) col='#ffff00';
+            else if(en.type==='uav') col='#ff00ff';
+            else if(en.type==='car') col=en.side==='hostile'?'#ff9900':'#00aaff';
+            else col=en.side==='hostile'?'#ff3030':'#00ffff';
             mCtx.fillStyle=col; mCtx.shadowColor=col; mCtx.shadowBlur=4;
-            mCtx.fillRect(cx+dx-1.5,cy+dz-1.5,3,3); mCtx.shadowBlur=0;
+            const sz=en.type==='uav'?4:2.5;
+            mCtx.fillRect(cx+dx-sz/2,cy+dz-sz/2,sz,sz); mCtx.shadowBlur=0;
         }
     });
     missiles.forEach(m=>{
@@ -606,25 +448,49 @@ const pathLineGeo=new THREE.BufferGeometry();
 const pathLine=new THREE.Line(pathLineGeo,new THREE.LineDashedMaterial({color:0xffff00,dashSize:3,gapSize:2,transparent:true,opacity:0.6}));
 scene.add(pathLine);
 
-// ─── SPAWN ───────────────────────────────────────────
+// ─── HELPERS ─────────────────────────────────────────
 function tooClose(x,z,r=50){
     return new THREE.Vector2(x,z).distanceTo(new THREE.Vector2(droneState.pos.x,droneState.pos.z))<r;
 }
 
+// ─── BUILDINGS (brighter edges + dark-green fill) ────
 function spawnBuilding(x,z){
     if(tooClose(x,z)) return;
-    const gY=getTerrainHeight(x,z), w=18+Math.random()*22, h=22+Math.random()*45, d=18+Math.random()*22;
-    const grp=new THREE.Group(), geo=new THREE.BoxGeometry(w,h,d);
-    grp.add(new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x001400,transparent:true,opacity:0.28})));
-    grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x00aa44,transparent:true,opacity:0.48})));
-    for(let i=0;i<5;i++){
-        const win=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({color:0x003800,transparent:true,opacity:0.5}));
-        win.position.set((Math.random()-.5)*w*.7,(Math.random()-.5)*h*.5,d/2+.1); grp.add(win);
+    const gY=getTerrainHeight(x,z);
+    const w=18+Math.random()*22, h=22+Math.random()*45, d=18+Math.random()*22;
+    const grp=new THREE.Group();
+    const geo=new THREE.BoxGeometry(w,h,d);
+
+    // Dark-green semi-transparent fill
+    grp.add(new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x002200,transparent:true,opacity:0.55})));
+
+    // BRIGHT wireframe edges
+    const edgeMat=new THREE.LineBasicMaterial({color:0x00ff66,transparent:true,opacity:0.9});
+    grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),edgeMat));
+
+    // Glowing windows
+    const winMat=new THREE.MeshBasicMaterial({color:0x00ff44,transparent:true,opacity:0.35});
+    const winGlowMat=new THREE.MeshBasicMaterial({color:0x88ffaa,transparent:true,opacity:0.18});
+    for(let i=0;i<6;i++){
+        const win=new THREE.Mesh(new THREE.PlaneGeometry(2.2,2.2),winMat);
+        const wx=(Math.random()-.5)*w*.75, wy=(Math.random()-.5)*h*.55;
+        win.position.set(wx,wy,d/2+.12); grp.add(win);
+        // soft glow behind window
+        const gw=new THREE.Mesh(new THREE.PlaneGeometry(4,4),winGlowMat);
+        gw.position.set(wx,wy,d/2+.1); grp.add(gw);
     }
+    // Corner accent lines (vertical)
+    const vMat=new THREE.LineBasicMaterial({color:0x44ffaa,opacity:0.7,transparent:true});
+    [[-w/2,-d/2],[w/2,-d/2],[-w/2,d/2],[w/2,d/2]].forEach(([cx2,cz2])=>{
+        const vg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(cx2,-h/2,cz2),new THREE.Vector3(cx2,h/2,cz2)]);
+        grp.add(new THREE.Line(vg,vMat));
+    });
+
     grp.position.set(x,gY+h/2,z); scene.add(grp);
     staticObstacles.push({position:new THREE.Vector3(x,gY,z),radius:(w+d)/2.2,height:h,mesh:grp});
 }
 
+// ─── TANKS ───────────────────────────────────────────
 function spawnTank(x,z){
     if(tooClose(x,z)) return;
     const gY=getTerrainHeight(x,z), grp=new THREE.Group();
@@ -638,6 +504,7 @@ function spawnTank(x,z){
         dir:new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),Math.random()*Math.PI*2),lastFire:0});
 }
 
+// ─── CARS ────────────────────────────────────────────
 function spawnCar(x,z){
     if(tooClose(x,z,35)) return;
     const gY=getTerrainHeight(x,z), hostile=Math.random()>.45;
@@ -651,32 +518,91 @@ function spawnCar(x,z){
         const wh=new THREE.Mesh(new THREE.CylinderGeometry(.44,.44,.28,8),wm);
         wh.rotation.z=Math.PI/2; wh.position.set(...p); grp.add(wh);
     });
-    // headlights
     const lm=new THREE.MeshBasicMaterial({color:0xffffaa,transparent:true,opacity:0.85});
     [[-0.65,0,2.28],[0.65,0,2.28]].forEach(p=>{
         const l=new THREE.Mesh(new THREE.BoxGeometry(.22,.18,.08),lm); l.position.set(...p); grp.add(l);
     });
     grp.position.set(x,gY+.45,z); scene.add(grp);
-    entities.push({
-        mesh:grp, type:'car', radius:2.5, height:1.6,
-        side:hostile?'hostile':'neutral',
+    entities.push({mesh:grp,type:'car',radius:2.5,height:1.6,side:hostile?'hostile':'neutral',
         speed:24+Math.random()*22,
         dir:new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),Math.random()*Math.PI*2),
-        lastFire:0,
-        isStopped:false, stopTimer:0
-    });
+        lastFire:0,isStopped:false,stopTimer:0});
 }
 
+// ─── TRENCHES (L-shape, T-shape, straight) ───────────
 function spawnTrench(x,z){
-    if(tooClose(x,z)) return;
-    const gY=getTerrainHeight(x,z), grp=new THREE.Group();
-    grp.add(new THREE.Mesh(new THREE.BoxGeometry(6,2,40),new THREE.MeshBasicMaterial({color:0x0a0a00,transparent:true,opacity:0.4,wireframe:true})));
-    grp.position.set(x,gY,z); scene.add(grp);
-    for(let i=0;i<5;i++) spawnSoldier(x+(Math.random()-.5)*4,z+(Math.random()-.5)*30,'hostile');
+    if(tooClose(x,z,40)) return;
+    const gY=getTerrainHeight(x,z);
+    const shapes=['straight','L','T'];
+    const shape=shapes[Math.floor(Math.random()*shapes.length)];
+    const angle=Math.random()*Math.PI*2;
+    const grp=new THREE.Group();
+    const trenchDepth=3.5; // deeper than ground
+    const trenchW=4, trenchL=40;
+
+    // Dirt fill material (darker than ground)
+    const dirtFill=new THREE.MeshBasicMaterial({color:0x0a0800,transparent:true,opacity:0.95});
+    const wallMat=new THREE.MeshBasicMaterial({color:0x1a1400,wireframe:true,transparent:true,opacity:0.6});
+    const rimMat=new THREE.LineBasicMaterial({color:0x886600,transparent:true,opacity:0.7});
+
+    function addSegment(lx,lz,len,rot=0){
+        // Sunken box
+        const geo=new THREE.BoxGeometry(trenchW,trenchDepth,len);
+        const fill=new THREE.Mesh(geo,dirtFill); fill.position.set(lx,-trenchDepth/2,lz); fill.rotation.y=rot; grp.add(fill);
+        const walls=new THREE.Mesh(geo,wallMat); walls.position.set(lx,-trenchDepth/2,lz); walls.rotation.y=rot; grp.add(walls);
+        // Rim (top edge outline)
+        const hw=trenchW/2, hl=len/2;
+        const rimPts=[
+            new THREE.Vector3(-hw,0,-hl),new THREE.Vector3(hw,0,-hl),
+            new THREE.Vector3(hw,0,hl),new THREE.Vector3(-hw,0,hl),
+            new THREE.Vector3(-hw,0,-hl)
+        ];
+        const rimGeo=new THREE.BufferGeometry().setFromPoints(rimPts);
+        const rim=new THREE.Line(rimGeo,rimMat); rim.position.set(lx,0,lz); rim.rotation.y=rot; grp.add(rim);
+    }
+
+    if(shape==='straight'){
+        addSegment(0,0,trenchL);
+    } else if(shape==='L'){
+        addSegment(0,-trenchL/4,trenchL/2);           // vertical arm
+        addSegment(trenchL/4,trenchL/4-2,trenchL/2,Math.PI/2); // horizontal arm
+    } else { // T
+        addSegment(0,0,trenchL);                        // main
+        addSegment(trenchL/4+2,0,trenchL*0.55,Math.PI/2); // cross
+    }
+
+    grp.rotation.y=angle;
+    grp.position.set(x,gY,z);
+    scene.add(grp);
+
+    // Spawn soldiers INSIDE trench (below terrain level)
+    const soldierCount=6+Math.floor(Math.random()*5);
+    for(let i=0;i<soldierCount;i++){
+        const ox=(Math.random()-.5)*(trenchL*.8);
+        const oz=(Math.random()-.5)*(trenchW*.5);
+        // Transform offset by trench rotation
+        const cosA=Math.cos(angle), sinA=Math.sin(angle);
+        const wx=x+ox*cosA-oz*sinA;
+        const wz=z+ox*sinA+oz*cosA;
+        spawnSoldierInTrench(wx,wz,gY-1.8); // sunken
+    }
+}
+
+function spawnSoldierInTrench(tx,tz,fixedY){
+    const mat=new THREE.MeshBasicMaterial({color:0xff2200,wireframe:true});
+    const grp=new THREE.Group();
+    grp.add(new THREE.Mesh(new THREE.BoxGeometry(.6,1.2,.5),mat));
+    const h=new THREE.Mesh(new THREE.BoxGeometry(.45,.45,.45),mat); h.position.y=.85; grp.add(h);
+    const gn=new THREE.Mesh(new THREE.BoxGeometry(.08,.08,.8),mat); gn.position.set(.3,.2,.3); grp.add(gn);
+    grp.position.set(tx,fixedY+.9,tz); scene.add(grp);
+    entities.push({mesh:grp,type:'soldier',radius:.8,height:1.8,speed:0,side:'hostile',lastFire:0,
+        dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),
+        inTrench:true, trenchY:fixedY});
 }
 
 function spawnSoldier(tx,tz,side){
-    const gY=getTerrainHeight(tx,tz), mat=new THREE.MeshBasicMaterial({color:side==='hostile'?0xff2200:0x00ffff,wireframe:true});
+    const gY=getTerrainHeight(tx,tz);
+    const mat=new THREE.MeshBasicMaterial({color:side==='hostile'?0xff2200:0x00ffff,wireframe:true});
     const grp=new THREE.Group();
     grp.add(new THREE.Mesh(new THREE.BoxGeometry(.6,1.2,.5),mat));
     const h=new THREE.Mesh(new THREE.BoxGeometry(.45,.45,.45),mat); h.position.y=.85; grp.add(h);
@@ -686,12 +612,79 @@ function spawnSoldier(tx,tz,side){
         dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize()});
 }
 
+// ─── ENEMY UAVs / DRONES ─────────────────────────────
+function buildUavMesh(size, color){
+    const grp=new THREE.Group();
+    const mat=new THREE.MeshBasicMaterial({color,wireframe:true});
+
+    // Arms (X pattern)
+    const arm1=new THREE.Mesh(new THREE.BoxGeometry(size*1.6,.04*size,.04*size),mat); arm1.rotation.y=Math.PI/4;
+    const arm2=new THREE.Mesh(new THREE.BoxGeometry(size*1.6,.04*size,.04*size),mat); arm2.rotation.y=-Math.PI/4;
+    grp.add(arm1,arm2);
+    // Central body
+    grp.add(new THREE.Mesh(new THREE.BoxGeometry(size*.35,size*.2,size*.4),mat));
+    // Prop rings
+    const ringR=size*.3;
+    [[size*.55,0,size*.55],[-(size*.55),0,size*.55],[size*.55,0,-(size*.55)],[-(size*.55),0,-(size*.55)]].forEach(p=>{
+        const ring=new THREE.Mesh(new THREE.TorusGeometry(ringR,.018*size,5,14),mat);
+        ring.position.set(...p); ring.rotation.x=Math.PI/2; grp.add(ring);
+    });
+    // Small payload
+    const pay=new THREE.Mesh(new THREE.CylinderGeometry(size*.06,size*.06,size*.4,7),mat);
+    pay.rotation.x=Math.PI/2; pay.position.y=-size*.2; grp.add(pay);
+    return grp;
+}
+
+function spawnUAV(x,z){
+    if(tooClose(x,z,60)) return;
+    const gY=getTerrainHeight(x,z);
+    const flyH=gY+30+Math.random()*80; // altitude 30-110m above ground
+    const size=0.6+Math.random()*0.8;
+    const hostile=Math.random()>.25; // mostly hostile
+    const color=hostile?0xff3300:0x00ffcc;
+    const mesh=buildUavMesh(size,color);
+    mesh.position.set(x,flyH,z);
+    scene.add(mesh);
+
+    // Waypoint-based flight path (3-5 waypoints in a circuit)
+    const wpCount=3+Math.floor(Math.random()*3);
+    const waypoints=[];
+    for(let i=0;i<wpCount;i++){
+        const angle=(i/wpCount)*Math.PI*2+Math.random()*.5;
+        const rad=80+Math.random()*200;
+        waypoints.push(new THREE.Vector3(
+            x+Math.cos(angle)*rad,
+            flyH+(Math.random()-.5)*30,
+            z+Math.sin(angle)*rad
+        ));
+    }
+
+    // Propeller spin meshes (reuse rings by tracking separate prop angles)
+    const uavProps=[];
+    mesh.traverse(child=>{
+        if(child instanceof THREE.Mesh && child.geometry instanceof THREE.TorusGeometry) uavProps.push(child);
+    });
+
+    entities.push({
+        mesh, type:'uav', radius:1.5*size, height:0.6*size,
+        side:hostile?'hostile':'neutral',
+        speed:18+Math.random()*30,
+        waypoints, wpIdx:0,
+        dir:new THREE.Vector3(0,0,1),
+        lastFire:0, props:uavProps,
+        propAngle:0
+    });
+}
+
+// ─── CHUNK GEN ───────────────────────────────────────
 function generateChunk(ox,oz){
     for(let i=0;i<8;i++) spawnBuilding(ox+(Math.random()-.5)*CHUNK_SIZE,oz+(Math.random()-.5)*CHUNK_SIZE);
     for(let i=0;i<5;i++) spawnTank(ox+(Math.random()-.5)*CHUNK_SIZE,oz+(Math.random()-.5)*CHUNK_SIZE);
     for(let i=0;i<7;i++) spawnCar(ox+(Math.random()-.5)*CHUNK_SIZE,oz+(Math.random()-.5)*CHUNK_SIZE);
-    for(let i=0;i<3;i++) spawnTrench(ox+(Math.random()-.5)*CHUNK_SIZE,oz+(Math.random()-.5)*CHUNK_SIZE);
+    for(let i=0;i<4;i++) spawnTrench(ox+(Math.random()-.5)*CHUNK_SIZE,oz+(Math.random()-.5)*CHUNK_SIZE);
+    for(let i=0;i<3;i++) spawnUAV(ox+(Math.random()-.5)*CHUNK_SIZE,oz+(Math.random()-.5)*CHUNK_SIZE);
 }
+
 function updateChunks(){
     const cx=Math.floor(droneState.pos.x/CHUNK_SIZE),cz=Math.floor(droneState.pos.z/CHUNK_SIZE);
     for(let x=cx-1;x<=cx+1;x++) for(let z=cz-1;z<=cz+1;z++){
@@ -702,23 +695,18 @@ function updateChunks(){
 
 // ─── BALLISTIC MISSILES ───────────────────────────────
 let nextMissileTime=18;
-
 function spawnMissile(){
     const tx=droneState.pos.x+(Math.random()-.5)*900;
     const tz=droneState.pos.z+(Math.random()-.5)*900;
     const targetY=getTerrainHeight(tx,tz);
     const sh=550+Math.random()*350;
-    const sx=tx+(Math.random()-.5)*400;
-    const sz=tz+(Math.random()-.5)*400;
+    const sx=tx+(Math.random()-.5)*400, sz=tz+(Math.random()-.5)*400;
     const target=new THREE.Vector3(tx,targetY,tz);
     const startPos=new THREE.Vector3(sx,sh,sz);
     const speed=170+Math.random()*70;
     const travelTime=startPos.distanceTo(target)/speed;
-
     playMissileWhistle(travelTime);
     nextMissileTime=clock.getElapsedTime()+18+Math.random()*22;
-
-    // Build missile mesh
     const grp=new THREE.Group();
     const mat=new THREE.MeshBasicMaterial({color:0xff00ff,wireframe:true});
     grp.add(new THREE.Mesh(new THREE.CylinderGeometry(.28,.28,4.5,8),mat));
@@ -727,50 +715,33 @@ function spawnMissile(){
         const fin=new THREE.Mesh(new THREE.BoxGeometry(.05,.7,.9),mat);
         fin.position.y=-1.9; fin.rotation.y=i*Math.PI/2; grp.add(fin);
     }
-    // Engine glow
     const eg=new THREE.Mesh(new THREE.SphereGeometry(.3,6,6),new THREE.MeshBasicMaterial({color:0x8800ff,transparent:true,opacity:0.7}));
     eg.position.y=-2.5; grp.add(eg);
     grp.position.copy(startPos); scene.add(grp);
-
-    // Contrail geometry
     const cGeo=new THREE.BufferGeometry();
     cGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(120*3),3));
     const cLine=new THREE.Line(cGeo,new THREE.LineBasicMaterial({color:0xdd88ff,transparent:true,opacity:0.55}));
     scene.add(cLine);
-
-    // Warning UI
     const pill=document.getElementById('pill-bm');
     pill.className='status-pill warn'; pill.textContent='⚡ BM: INBOUND!';
     const mw=document.getElementById('missile-warning');
     mw.style.display='block'; setTimeout(()=>mw.style.display='none',1500);
-
-    missiles.push({
-        mesh:grp, pos:startPos.clone(), target,
-        dir:target.clone().sub(startPos).normalize(),
-        speed, cLine, cPts:[startPos.clone()]
-    });
+    missiles.push({mesh:grp,pos:startPos.clone(),target,dir:target.clone().sub(startPos).normalize(),speed,cLine,cPts:[startPos.clone()]});
 }
 
 function updateMissiles(dt,time){
     if(time>nextMissileTime&&missiles.length<4) spawnMissile();
-
     for(let i=missiles.length-1;i>=0;i--){
         const m=missiles[i];
         m.pos.addScaledVector(m.dir,m.speed*dt);
         m.mesh.position.copy(m.pos);
-        // orient nose-down along velocity
-        m.mesh.lookAt(m.target);
-        m.mesh.rotateX(Math.PI/2);
-
-        // contrail
+        m.mesh.lookAt(m.target); m.mesh.rotateX(Math.PI/2);
         m.cPts.push(m.pos.clone());
         if(m.cPts.length>60) m.cPts.shift();
         const cp=m.cLine.geometry.attributes.position.array;
         m.cPts.forEach((p,idx)=>{cp[idx*3]=p.x;cp[idx*3+1]=p.y;cp[idx*3+2]=p.z;});
         m.cLine.geometry.attributes.position.needsUpdate=true;
         m.cLine.geometry.setDrawRange(0,m.cPts.length);
-
-        // impact?
         const gY=getTerrainHeight(m.pos.x,m.pos.z);
         let hit=m.pos.y<=gY+1.5;
         if(!hit) staticObstacles.forEach(o=>{
@@ -779,26 +750,25 @@ function updateMissiles(dt,time){
         });
         if(hit){
             createExplosion(m.pos.clone(),0xff00ff,90,true);
-            // shockwave damage
             for(let j=entities.length-1;j>=0;j--){
                 if(m.pos.distanceTo(entities[j].mesh.position)<40){
                     createExplosion(entities[j].mesh.position.clone(),0xff4400,20);
                     scene.remove(entities[j].mesh); entities.splice(j,1);
                 }
             }
-            // screen shake
             document.getElementById('chromatic').classList.add('active');
             setTimeout(()=>document.getElementById('chromatic').classList.remove('active'),500);
             scene.remove(m.mesh); scene.remove(m.cLine);
             missiles.splice(i,1);
         }
     }
-    if(missiles.length===0){ const p=document.getElementById('pill-bm'); p.className='status-pill blue'; p.textContent='BM: CLEAR'; }
+    if(missiles.length===0){const p=document.getElementById('pill-bm'); p.className='status-pill blue'; p.textContent='BM: CLEAR';}
 }
 
 // ─── AVOIDANCE ───────────────────────────────────────
 function applyAvoidance(en){
-    const ad=en.type==='tank'?25:en.type==='car'?18:10;
+    const ad=en.type==='tank'?25:en.type==='car'?18:en.type==='uav'?0:10;
+    if(ad===0) return; // UAVs fly freely
     for(let o of staticObstacles){
         const dist=en.mesh.position.distanceTo(o.position);
         if(dist<ad+o.radius){
@@ -839,7 +809,6 @@ function updateEntities(dt,time){
                 en.mesh.position.addScaledVector(en.dir,en.speed*dt);
                 en.mesh.position.y=getTerrainHeight(en.mesh.position.x,en.mesh.position.z)+.45;
                 en.mesh.lookAt(en.mesh.position.clone().add(en.dir));
-                // random stop ~0.5% chance per frame (≈every 8-20s at 60fps)
                 if(Math.random()<.0055){ en.isStopped=true; en.stopTimer=1.2+Math.random()*3.5; }
             }
             if(en.side==='hostile'&&time>en.lastFire&&droneState.pos.distanceTo(en.mesh.position)<210){
@@ -847,13 +816,48 @@ function updateEntities(dt,time){
                 en.lastFire=time+1.8+Math.random()*2;
             }
         }
-        else if(en.type==='soldier'&&en.speed>0){
-            applyAvoidance(en);
+        else if(en.type==='soldier'){
+            // Trench soldiers: stay at fixed depth, just rotate to face drone when close
+            if(en.inTrench){
+                en.mesh.position.y=en.trenchY+.9;
+                const toDrone=droneState.pos.clone().sub(en.mesh.position);
+                const dist=toDrone.length();
+                if(dist<120&&time>en.lastFire){
+                    createTracer(en.mesh.position.clone().add(new THREE.Vector3(0,1,0)),droneState.pos,0xffaa00);
+                    en.lastFire=time+0.8+Math.random()*1.5;
+                }
+            } else if(en.speed>0){
+                applyAvoidance(en);
+                en.mesh.position.addScaledVector(en.dir,en.speed*dt);
+                en.mesh.position.y=getTerrainHeight(en.mesh.position.x,en.mesh.position.z)+.9;
+                if(time>en.lastFire&&droneState.pos.distanceTo(en.mesh.position)<180){
+                    createTracer(en.mesh.position.clone().add(new THREE.Vector3(0,1,0)),droneState.pos,0xffaa00);
+                    en.lastFire=time+1+Math.random()*2;
+                }
+            }
+        }
+        else if(en.type==='uav'){
+            // Waypoint navigation
+            if(en.waypoints.length>0){
+                const wp=en.waypoints[en.wpIdx];
+                const toWp=wp.clone().sub(en.mesh.position);
+                const distWp=toWp.length();
+                if(distWp<12){
+                    en.wpIdx=(en.wpIdx+1)%en.waypoints.length;
+                } else {
+                    en.dir.lerp(toWp.normalize(),.04).normalize();
+                }
+            }
             en.mesh.position.addScaledVector(en.dir,en.speed*dt);
-            en.mesh.position.y=getTerrainHeight(en.mesh.position.x,en.mesh.position.z)+.9;
-            if(time>en.lastFire&&droneState.pos.distanceTo(en.mesh.position)<180){
-                createTracer(en.mesh.position.clone().add(new THREE.Vector3(0,1,0)),droneState.pos,0xffaa00);
-                en.lastFire=time+1+Math.random()*2;
+            // Gentle banking
+            en.mesh.lookAt(en.mesh.position.clone().add(en.dir));
+            // Prop spin
+            en.propAngle=(en.propAngle||0)+dt*15;
+            if(en.props) en.props.forEach((p,i)=>p.rotation.z+=(i%2===0?1:-1)*dt*14);
+            // Hostile UAVs fire at player
+            if(en.side==='hostile'&&time>en.lastFire&&droneState.pos.distanceTo(en.mesh.position)<200){
+                createTracer(en.mesh.position.clone(),droneState.pos,0xff3300);
+                en.lastFire=time+1.5+Math.random()*2;
             }
         }
     });
@@ -927,7 +931,7 @@ nipplejs.create({zone:document.getElementById('joystick-right'),mode:'static',po
 // ─── INIT ────────────────────────────────────────────
 createGround(); createDetailedDrone(); initTrail();
 
-// ─── LOOP ────────────────────────────────────────────
+// ─── MAIN LOOP ───────────────────────────────────────
 function animate(){
     if(isGameOver){ renderer.render(scene,camera); return; }
     requestAnimationFrame(animate);
@@ -1006,16 +1010,17 @@ function animate(){
     document.getElementById('spd-t2').textContent=(speed+20).toFixed(0);
     const hdg=((droneState.rotY*180/Math.PI)%360+360)%360;
     document.getElementById('heading-deg').textContent=hdg.toFixed(0).padStart(3,'0')+'°';
-
-    // Chromatic on speed
     const ch=document.getElementById('chromatic');
     if(speed>90) ch.classList.add('active'); else ch.classList.remove('active');
-
-    // Threat pill
     const cl=entities.filter(e=>e.side==='hostile').reduce((c,en)=>{const d=droneState.pos.distanceTo(en.mesh.position);return(!c||d<c.d)?{d}:c;},null);
     const pt=document.getElementById('pill-threat');
     if(cl&&cl.d<100){pt.className='status-pill warn';pt.textContent='⚡ THREAT: CRITICAL';}
     else{pt.className='status-pill hot';pt.textContent='THREAT: HIGH';}
+    // UAV counter
+    const uavCount=entities.filter(e=>e.type==='uav'&&e.side==='hostile').length;
+    const pu=document.getElementById('pill-uav');
+    pu.textContent=`UAV: ${uavCount}`;
+    pu.className=uavCount>0?'status-pill purple':'status-pill blue';
 
     renderer.render(scene,camera);
 }
