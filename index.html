@@ -77,11 +77,8 @@ canvas{display:block;}
 #joystick-left,#joystick-right{position:absolute;bottom:10%;width:140px;height:140px;z-index:20;opacity:.55;}
 #joystick-left{left:5%;}#joystick-right{right:5%;}
 
-/* BOTTOM HUD */
-#bottom-hud{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;z-index:60;pointer-events:none;flex-wrap:wrap;justify-content:center;}
-.status-pill{font-family:‘Share Tech Mono’,monospace;font-size:9px;padding:4px 10px;letter-spacing:2px;border:1px solid currentColor;color:rgba(57,255,20,.7);background:rgba(0,20,0,.6);}
-.status-pill.warn{color:#ff4444;animation:blink .8s infinite;}
-.status-pill.hot{color:#ff9900;}.status-pill.blue{color:#00ffff;}.status-pill.purple{color:#ff00ff;}
+/* status-pill classes kept for potential reuse */
+.status-pill{display:none;}
 
 /* MISSILE WARNING */
 #missile-warning{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:80;display:none;border:4px solid transparent;animation:mw-flash .35s 4;}
@@ -210,14 +207,7 @@ canvas{display:block;}
   </div>
 </div>
 
-<div id="bottom-hud">
-  <div class="status-pill" id="pill-sys">SYS: ONLINE</div>
-  <div class="status-pill blue" id="pill-bldg">BLDG: 0</div>
-  <div class="status-pill hot" id="pill-cars">CAR: 0</div>
-  <div class="status-pill warn" id="pill-threat">THREAT: HIGH</div>
-  <div class="status-pill purple" id="pill-uav">UAV: 0</div>
-  <div class="status-pill" id="pill-gps">GPS: LOCK</div>
-</div>
+<!-- bottom-hud removed -->
 
 <div id="joystick-left"></div>
 <div id="joystick-right"></div>
@@ -278,6 +268,7 @@ let currentMissionTarget=null;
 
 // Path line (dashed) to priority target
 const pathLineGeo=new THREE.BufferGeometry();
+pathLineGeo.setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,0)]); // init non-empty
 const pathLine=new THREE.Line(pathLineGeo,new THREE.LineDashedMaterial({color:0xffff00,dashSize:3,gapSize:2,transparent:true,opacity:0.65}));
 scene.add(pathLine);
 
@@ -434,8 +425,6 @@ async function buildScene(data){
     }
   }
   spawnCarsOnNewRoads();
-  const bEl=document.getElementById('obj-dist'); if(bEl&&!currentMissionTarget) bEl.textContent=`DST: ---`;
-  const pEl=document.getElementById('pill-bldg'); if(pEl) pEl.textContent=`BLDG: ${totalBldgCount}`;
 }
 
 // ══════════════════════════════════════════════════════
@@ -517,7 +506,6 @@ function updateCars(dt){
     c.mesh.position.set(px+nx*c.laneOffset,.42,pz+nz*c.laneOffset);
     c.mesh.rotation.set(0,Math.atan2(dx,dz),0);
   }
-  const el=document.getElementById('pill-cars'); if(el) el.textContent=`CAR: ${cars.length}`;
 }
 
 // ══════════════════════════════════════════════════════
@@ -623,12 +611,16 @@ function updateEntities(dt,time){
       applyAvoidance(en);
       en.mesh.position.addScaledVector(en.dir,en.speed*dt);
       en.mesh.position.y=.75;
-      en.mesh.lookAt(en.mesh.position.clone().add(en.dir));
+      // lookAt needs a non-zero Y offset to avoid gimbal glitch on flat plane
+      const lookTarget=en.mesh.position.clone().add(new THREE.Vector3(en.dir.x,0,en.dir.z));
+      en.mesh.lookAt(lookTarget);
       if(time>en.lastFire){createTracer(en.mesh.position.clone().add(new THREE.Vector3(0,1.5,0)),droneState.pos,0xff5500);en.lastFire=time+3+Math.random();}
     } else if(en.type==='soldier'){
       applyAvoidance(en);
       en.mesh.position.addScaledVector(en.dir,en.speed*dt);
       en.mesh.position.y=.9;
+      const sLook=en.mesh.position.clone().add(new THREE.Vector3(en.dir.x,0,en.dir.z));
+      en.mesh.lookAt(sLook);
       if(time>en.lastFire&&droneState.pos.distanceTo(en.mesh.position)<200){
         createTracer(en.mesh.position.clone().add(new THREE.Vector3(0,1,0)),droneState.pos,0xffaa00);
         en.lastFire=time+1+Math.random()*2;
@@ -655,48 +647,95 @@ function updateEntities(dt,time){
 //  MISSION — PRIORITY TARGET + DASHED PATH LINE
 // ══════════════════════════════════════════════════════
 function updateMission(){
-  if(!currentMissionTarget||entities.indexOf(currentMissionTarget)===-1){
+  // Re-select if target gone
+  if(!currentMissionTarget || entities.indexOf(currentMissionTarget)===-1){
+    currentMissionTarget=null;
     const targets=entities.filter(e=>e.side==='hostile');
-    if(targets.length>0) currentMissionTarget=targets[Math.floor(Math.random()*targets.length)];
-    else { pathLineGeo.setFromPoints([]); return; }
+    if(targets.length>0){
+      currentMissionTarget=targets[Math.floor(Math.random()*targets.length)];
+    } else {
+      // No hostile targets - clear path line
+      pathLineGeo.setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,0)]);
+      pathLine.computeLineDistances();
+      document.getElementById('obj-type').textContent='---';
+      document.getElementById('obj-dist').textContent='DST: ---';
+      return;
+    }
   }
   const dist=droneState.pos.distanceTo(currentMissionTarget.mesh.position);
   document.getElementById('obj-type').textContent=currentMissionTarget.type.toUpperCase();
   document.getElementById('obj-dist').textContent=`DST: ${dist.toFixed(0)}m`;
-  // Build dashed path
+
+  // Build dashed path: 20 interpolated points, min height 2m
   const pts=[];
   for(let i=0;i<=20;i++){
     const a=i/20;
     const p=new THREE.Vector3().lerpVectors(droneState.pos,currentMissionTarget.mesh.position,a);
-    if(p.y<1) p.y=1;
+    if(p.y<2) p.y=2;
     pts.push(p);
   }
-  pathLineGeo.setFromPoints(pts); pathLine.computeLineDistances();
+  pathLineGeo.setFromPoints(pts);
+  pathLine.computeLineDistances();
 }
 
 // ══════════════════════════════════════════════════════
-//  TARGET SEEKER (nearest hostile in camera FOV)
+//  TARGET SEEKER
+//  • Priority target  → yellow reticle (#target-ui.priority)
+//  • All other targets → red reticle   (default #target-ui)
+//  • Cars are shown as regular (red) targets
 // ══════════════════════════════════════════════════════
 function updateSeeker(){
-  let best=null,minD=300;
   const ui=document.getElementById('target-ui');
-  // Include entities AND cars
-  const allTargets=[...entities,...cars.map(c=>({mesh:c.mesh,type:'car',side:'neutral',radius:2}))];
+
+  // Build combined target list: combat entities + cars
+  const allTargets=[
+    ...entities,
+    ...cars.map(c=>({mesh:c.mesh,type:'car',side:'neutral',radius:2,_isCar:true}))
+  ];
+
+  // 1) Always try to show the priority target if it's in FOV
+  let priorityScreenPos=null;
+  if(currentMissionTarget&&entities.indexOf(currentMissionTarget)!==-1){
+    const pp=currentMissionTarget.mesh.position.clone().project(camera);
+    if(Math.abs(pp.z)<1&&Math.abs(pp.x)<.88&&Math.abs(pp.y)<.88){
+      priorityScreenPos={
+        x:(pp.x*.5+.5)*innerWidth,
+        y:(pp.y*-.5+.5)*innerHeight,
+        dist:droneState.pos.distanceTo(currentMissionTarget.mesh.position),
+        type:currentMissionTarget.type
+      };
+    }
+  }
+
+  // 2) Find nearest NON-priority target in FOV (excluding currentMissionTarget)
+  let best=null, minD=350;
   allTargets.forEach(en=>{
+    if(en===currentMissionTarget) return; // handled separately
     const dist=droneState.pos.distanceTo(en.mesh.position);
     if(dist<minD){
       const p=en.mesh.position.clone().project(camera);
-      if(Math.abs(p.z)<1&&Math.abs(p.x)<.85&&Math.abs(p.y)<.85){
-        minD=dist; best={x:(p.x*.5+.5)*innerWidth,y:(p.y*-.5+.5)*innerHeight,type:en.type,dist,target:en};
+      if(Math.abs(p.z)<1&&Math.abs(p.x)<.88&&Math.abs(p.y)<.88){
+        minD=dist; best={x:(p.x*.5+.5)*innerWidth,y:(p.y*-.5+.5)*innerHeight,type:en.type,dist};
       }
     }
   });
-  if(best){
-    ui.style.display='block'; ui.style.left=best.x+'px'; ui.style.top=best.y+'px';
-    ui.className=best.target===currentMissionTarget?'priority':'';
-    document.getElementById('target-label').textContent=best.type.toUpperCase();
-    document.getElementById('target-dist').textContent=`${best.dist.toFixed(0)}m`;
-  } else ui.style.display='none';
+
+  // 3) Decide what to show
+  // Priority wins if in FOV, otherwise show nearest regular
+  const show=priorityScreenPos||best;
+  const isPriority=!!priorityScreenPos;
+
+  if(show){
+    ui.style.display='block';
+    ui.style.left=show.x+'px';
+    ui.style.top=show.y+'px';
+    // Class controls colour: 'priority' = yellow, '' = red
+    ui.className=isPriority?'priority':'';
+    document.getElementById('target-label').textContent=show.type.toUpperCase();
+    document.getElementById('target-dist').textContent=`${show.dist.toFixed(0)}m`;
+  } else {
+    ui.style.display='none';
+  }
 }
 
 // ══════════════════════════════════════════════════════
@@ -923,7 +962,7 @@ function animate(){
   checkAndLoadNewZone();
 
   // Audio
-  if(droneOsc){const f=65+droneState.vel.length()*3.5;droneOsc.frequency.setTargetAtTime(f,audioCtx.currentTime,.08);droneOsc2.frequency.setTargetAtTime(f+9,audioCtx.currentTime,.08);}
+  if(audioCtx&&droneOsc){const f=65+droneState.vel.length()*3.5;droneOsc.frequency.setTargetAtTime(f,audioCtx.currentTime,.08);droneOsc2.frequency.setTargetAtTime(f+9,audioCtx.currentTime,.08);}
 
   // Props
   props.forEach((p,i)=>p.rotation.y+=(40+(input.left.y+1)*40)*dt*(i%2===0?1:-1));
@@ -937,7 +976,7 @@ function animate(){
   droneState.vel.y+=(input.left.y*PHYSICS.lift-9.81)*dt;
   droneState.vel.multiplyScalar(PHYSICS.friction);
   droneState.pos.addScaledVector(droneState.vel,dt);
-  if(droneState.pos.y<0.4){droneState.pos.y=0.4;droneState.vel.y=0;endGame('Упал на землю');}
+  if(droneState.pos.y<0.4){droneState.pos.y=0.4;droneState.vel.y=0; /* handled below */}
 
   droneGroup.position.copy(droneState.pos);
   droneGroup.rotation.set(0,0,0); droneGroup.rotateY(droneState.rotY); droneGroup.rotateX(droneState.tiltX); droneGroup.rotateZ(droneState.tiltZ);
@@ -964,10 +1003,10 @@ function animate(){
     p.life-=dt; if(p.life<=0){scene.remove(p.mesh);particles.splice(i,1);}
   }
 
-  // Collision: ground
-  if(droneState.pos.y<0.4) endGame('Упал на землю');
-  // Collision: buildings (polygon)
+  // Collision: ground (single check)
   const px=droneState.pos.x,py=droneState.pos.y,pz=droneState.pos.z;
+  if(py<0.4){ droneState.pos.y=0.4; droneState.vel.y=0; endGame('Упал на землю'); return; }
+  // Collision: buildings (polygon)
   for(const b of staticBuildings){
     if(Math.abs(px-b.cx)>b.hw+1.5||Math.abs(pz-b.cz)>b.hd+1.5) continue;
     if(py<0||py>b.height+.5) continue;
@@ -992,15 +1031,6 @@ function animate(){
   const hdg=((droneState.rotY*180/Math.PI)%360+360)%360;
   document.getElementById('heading-deg').textContent=hdg.toFixed(0).padStart(3,'0')+'°';
   const ch=document.getElementById('chromatic'); if(speed>80)ch.classList.add('active');else ch.classList.remove('active');
-
-  // Threat pill
-  const hostile=entities.filter(e=>e.side==='hostile');
-  const nearest=hostile.reduce((c,e)=>{const d=droneState.pos.distanceTo(e.mesh.position);return(!c||d<c.d)?{d,e}:c;},null);
-  const pt=document.getElementById('pill-threat');
-  if(nearest&&nearest.d<120){pt.className='status-pill warn';pt.textContent='⚡ THREAT: CRIT';}
-  else{pt.className='status-pill hot';pt.textContent='THREAT: HIGH';}
-  const uavCount=entities.filter(e=>e.type==='uav').length;
-  const pu=document.getElementById('pill-uav'); pu.textContent=`UAV: ${uavCount}`; pu.className=uavCount>0?'status-pill purple':'status-pill';
 
   renderer.render(scene,camera);
 }
