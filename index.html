@@ -10,15 +10,13 @@
 *{margin:0;padding:0;user-select:none;-webkit-user-select:none;touch-action:none;box-sizing:border-box;}
 body{background:#000;font-family:'Share Tech Mono',monospace;overflow:hidden;}
 canvas{display:block;}
-
-/* ── overlay FX ── */
 #scanlines{position:fixed;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.13) 2px,rgba(0,0,0,0.13) 4px);pointer-events:none;z-index:50;mix-blend-mode:multiply;}
 #vignette{position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse at center,transparent 38%,rgba(0,0,0,0.88) 100%);pointer-events:none;z-index:51;}
 #chromatic{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:49;mix-blend-mode:screen;background:transparent;transition:opacity .1s;opacity:0;}
 #chromatic.active{opacity:1;background:linear-gradient(90deg,rgba(255,0,0,.05) 0%,transparent 25%,transparent 75%,rgba(0,80,255,.05) 100%);}
 
-/* ── HUD panels ── */
-#osd-left{position:absolute;top:20px;left:80px;color:#39ff14;font-family:‘Share Tech Mono’,monospace;font-size:11px;pointer-events:none;z-index:60;line-height:1.7;background:linear-gradient(135deg,rgba(0,20,0,.72),rgba(0,40,0,.45));border:1px solid rgba(57,255,20,.3);border-left:3px solid #39ff14;padding:12px 14px;min-width:170px;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%);}
+/* OSD LEFT */
+#osd-left{position:absolute;top:20px;left:80px;color:#39ff14;font-family:‘Share Tech Mono’,monospace;font-size:11px;pointer-events:none;z-index:60;line-height:1.7;background:linear-gradient(135deg,rgba(0,20,0,.72),rgba(0,40,0,.45));border:1px solid rgba(57,255,20,.3);border-left:3px solid #39ff14;padding:12px 14px;min-width:175px;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%);}
 #osd-left::before{content:’’;position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,#39ff14,transparent);}
 .hud-label{color:rgba(57,255,20,.5);font-size:9px;letter-spacing:2px;text-transform:uppercase;}
 #mission-info{margin-top:10px;border-top:1px solid rgba(57,255,20,.2);padding-top:8px;}
@@ -28,7 +26,7 @@ canvas{display:block;}
 #god-status{margin-top:8px;color:#ff6600;font-size:9px;letter-spacing:1px;animation:blink 2s infinite;}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
 
-/* ── minimap ── */
+/* MINIMAP */
 #osd-right{position:absolute;margin:30px;top:20px;right:20px;width:130px;height:130px;border-radius:50%;overflow:hidden;border:2px solid rgba(57,255,20,.4);box-shadow:0 0 20px rgba(57,255,20,.3),inset 0 0 30px rgba(0,0,0,.8);background:rgba(0,8,0,.85);pointer-events:none;z-index:60;}
 #minimap-container{position:relative;width:100%;height:100%;}
 #minimap-canvas{width:100%;height:100%;}
@@ -36,12 +34,12 @@ canvas{display:block;}
 #minimap-sweep{position:absolute;top:0;left:0;width:100%;height:100%;border-radius:50%;background:conic-gradient(from 0deg,rgba(57,255,20,.18) 0deg,transparent 60deg,transparent 360deg);animation:sweep 3s linear infinite;}
 @keyframes sweep{to{transform:rotate(360deg);}}
 
-/* ── heading ── */
+/* HEADING */
 #heading-tape{position:absolute;top:20px;left:50%;transform:translateX(-50%);width:230px;height:30px;overflow:hidden;border:1px solid rgba(57,255,20,.3);background:rgba(0,15,0,.68);backdrop-filter:blur(4px);z-index:60;pointer-events:none;}
 #heading-inner{font-family:‘Share Tech Mono’,monospace;font-size:10px;color:rgba(57,255,20,.6);display:flex;align-items:center;height:100%;padding:0 10px;justify-content:space-between;letter-spacing:2px;}
 #heading-deg{color:#39ff14;font-size:14px;font-weight:bold;text-shadow:0 0 10px #39ff14;}
 
-/* ── alt & spd tapes (no background) ── */
+/* ALT/SPD TAPES */
 #alt-tape{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:55px;height:230px;overflow:visible;z-index:60;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:transparent;}
 #alt-tape::after{content:’’;position:absolute;left:4px;right:4px;top:50%;height:1px;background:rgba(57,255,20,.55);box-shadow:0 0 4px rgba(57,255,20,.6);}
 #alt-border{position:absolute;top:0;bottom:0;right:0;width:1px;background:linear-gradient(180deg,transparent,rgba(57,255,20,.5) 20%,rgba(57,255,20,.5) 80%,transparent);}
@@ -53,12 +51,10 @@ canvas{display:block;}
 #spd-big{font-size:20px;color:#00ffff;text-shadow:0 0 14px #00ffff,0 0 28px rgba(0,255,255,.4);font-family:‘Orbitron’,monospace;font-weight:700;}
 #spd-unit{font-size:8px;color:rgba(0,255,255,.55);letter-spacing:2px;}
 .tape-tick{width:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:5px;gap:3px;}
-.tick-line{height:1px;background:rgba(57,255,20,.4);}
-.tick-num{font-size:7px;color:rgba(57,255,20,.5);}
-.tick-line-c{height:1px;background:rgba(0,255,255,.4);}
-.tick-num-c{font-size:7px;color:rgba(0,255,255,.5);}
+.tick-line{height:1px;background:rgba(57,255,20,.4);}.tick-num{font-size:7px;color:rgba(57,255,20,.5);}
+.tick-line-c{height:1px;background:rgba(0,255,255,.4);}.tick-num-c{font-size:7px;color:rgba(0,255,255,.5);}
 
-/* ── target lock ── */
+/* TARGET LOCK */
 #target-ui{position:absolute;width:80px;height:80px;display:none;transform:translate(-50%,-50%);pointer-events:none;z-index:60;}
 #target-inner{width:100%;height:100%;border:1.5px solid rgba(255,40,40,.9);border-radius:2px;position:relative;animation:lock-pulse 1s infinite;}
 #target-ui.priority #target-inner{border-color:rgba(255,255,0,.95);animation:lock-pulse-yellow .6s infinite;}
@@ -70,26 +66,32 @@ canvas{display:block;}
 #target-dist{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);color:#fff;font-size:9px;background:rgba(255,40,40,.6);padding:1px 5px;letter-spacing:1px;}
 .priority #target-dist{background:rgba(255,200,0,.7);color:#000;}
 
-/* ── crosshair ── */
+/* CROSSHAIR */
 #crosshair{position:absolute;top:50%;left:50%;width:50px;height:50px;transform:translate(-50%,-50%);pointer-events:none;z-index:60;}
 .ch-h,.ch-v{position:absolute;background:rgba(57,255,20,.55);}
 .ch-h{width:20px;height:1px;top:50%;}.ch-h.left{right:60%;}.ch-h.right{left:60%;}
 .ch-v{height:20px;width:1px;left:50%;}.ch-v.top{bottom:60%;}.ch-v.bottom{top:60%;}
 .ch-dot{position:absolute;width:3px;height:3px;background:rgba(57,255,20,.9);top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;box-shadow:0 0 6px #39ff14;}
 
-/* ── joysticks ── */
+/* JOYSTICKS */
 #joystick-left,#joystick-right{position:absolute;bottom:10%;width:140px;height:140px;z-index:20;opacity:.55;}
 #joystick-left{left:5%;}#joystick-right{right:5%;}
 
-/* ── bottom hud ── */
-#bottom-hud{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;z-index:60;pointer-events:none;}
+/* BOTTOM HUD */
+#bottom-hud{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;z-index:60;pointer-events:none;flex-wrap:wrap;justify-content:center;}
 .status-pill{font-family:‘Share Tech Mono’,monospace;font-size:9px;padding:4px 10px;letter-spacing:2px;border:1px solid currentColor;color:rgba(57,255,20,.7);background:rgba(0,20,0,.6);}
 .status-pill.warn{color:#ff4444;animation:blink .8s infinite;}
-.status-pill.hot{color:#ff9900;}
-.status-pill.blue{color:#00ffff;}
-.status-pill.purple{color:#ff00ff;}
+.status-pill.hot{color:#ff9900;}.status-pill.blue{color:#00ffff;}.status-pill.purple{color:#ff00ff;}
 
-/* ── start / loading screen ── */
+/* MISSILE WARNING */
+#missile-warning{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:80;display:none;border:4px solid transparent;animation:mw-flash .35s 4;}
+@keyframes mw-flash{0%,100%{border-color:rgba(255,0,255,0);}50%{border-color:rgba(255,0,255,.85);box-shadow:inset 0 0 80px rgba(200,0,255,.2);}}
+
+/* CHUNK INDICATOR */
+#chunk-indicator{position:fixed;top:60px;left:50%;transform:translateX(-50%);font-size:9px;color:rgba(57,255,20,.4);letter-spacing:2px;pointer-events:none;z-index:60;opacity:0;transition:opacity .5s;}
+#chunk-indicator.show{opacity:1;}
+
+/* START / LOADING */
 #start-prompt{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.97);z-index:2000;display:flex;justify-content:center;align-items:center;}
 .start-box{text-align:center;padding:50px 60px;border:2px solid rgba(57,255,20,.6);background:linear-gradient(135deg,rgba(0,15,0,.9),rgba(0,30,0,.6));clip-path:polygon(0 0,calc(100% - 25px) 0,100% 25px,100% 100%,25px 100%,0 calc(100% - 25px));box-shadow:0 0 60px rgba(57,255,20,.3),inset 0 0 40px rgba(57,255,20,.05);max-width:480px;width:90%;}
 .start-title{font-family:‘Orbitron’,monospace;font-size:42px;font-weight:900;color:#39ff14;text-shadow:0 0 30px #39ff14,0 0 60px #00ff00;letter-spacing:6px;margin-bottom:6px;}
@@ -107,7 +109,7 @@ canvas{display:block;}
 #coords-input-wrap input::placeholder{color:rgba(57,255,20,.3);}
 #coords-input-wrap input:focus{border-color:#39ff14;}
 
-/* ── static / restart ── */
+/* STATIC / RESTART */
 #static-noise{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;display:none;z-index:900;animation:static-flicker .06s infinite;}
 @keyframes static-flicker{0%{opacity:.35;filter:brightness(1.5) contrast(2);}50%{opacity:.65;filter:brightness(2.2) contrast(3) hue-rotate(20deg);}100%{opacity:.2;filter:brightness(1) contrast(1.5);}}
 #restart-screen{position:fixed;top:0;left:0;width:100%;height:100%;display:none;z-index:1000;background:rgba(0,0,0,.92);align-items:center;justify-content:center;}
@@ -116,139 +118,105 @@ canvas{display:block;}
 #res-sub{font-size:11px;color:rgba(255,80,80,.7);letter-spacing:4px;margin-bottom:30px;}
 .screen-content button{background:transparent;color:#ff1a1a;border:1px solid #ff1a1a;padding:14px 35px;font-family:‘Orbitron’,monospace;cursor:pointer;font-size:13px;letter-spacing:4px;transition:all .2s;}
 .screen-content button:hover{background:#ff1a1a;color:#000;box-shadow:0 0 20px #ff1a1a;}
-.success{border-color:#39ff14!important;background:linear-gradient(135deg,rgba(0,20,0,.9),rgba(0,40,0,.7))!important;box-shadow:0 0 40px rgba(57,255,20,.4),inset 0 0 30px rgba(57,255,20,.05)!important;}
-.success #res-msg{color:#39ff14!important;text-shadow:0 0 30px #39ff14,0 0 60px #00ff00!important;}
+.success{border-color:#39ff14!important;background:linear-gradient(135deg,rgba(0,20,0,.9),rgba(0,40,0,.7))!important;}
+.success #res-msg{color:#39ff14!important;text-shadow:0 0 30px #39ff14!important;}
 .success button{color:#39ff14!important;border-color:#39ff14!important;}
 .success button:hover{background:#39ff14!important;color:#000!important;}
-
-/* ── OSM credit ── */
-#osm-credit{position:fixed;bottom:6px;right:8px;font-size:8px;color:rgba(57,255,20,.35);pointer-events:none;z-index:60;letter-spacing:1px;}
+#osm-credit{position:fixed;bottom:6px;right:8px;font-size:8px;color:rgba(57,255,20,.35);pointer-events:none;z-index:60;}
 </style>
 
 </head>
 <body>
 
-<!-- START SCREEN -->
-
 <div id="start-prompt">
-    <div class="start-box">
-        <div class="start-title">myFPV</div>
-        <div class="start-sub">REAL WORLD · FPV SIMULATOR</div>
-
-```
-    <button class="start-btn" id="btn-geo" onclick="startWithGeo()">📍 МОЯ ГЕОПОЗИЦИЯ</button>
-    <br>
+  <div class="start-box">
+    <div class="start-title">myFPV</div>
+    <div class="start-sub">REAL WORLD · FPV COMBAT SIM</div>
+    <button class="start-btn" id="btn-geo" onclick="startWithGeo()">📍 МОЯ ГЕОПОЗИЦИЯ</button><br>
     <button class="start-btn sec" id="btn-manual" onclick="showManualInput()">✎ ВВЕСТИ КООРДИНАТЫ</button>
-
     <div id="coords-input-wrap">
-        <input type="text" id="coords-input" placeholder="55.7558, 37.6173  (Москва)" />
-        <button class="start-btn" style="margin-top:10px;font-size:11px;padding:10px 28px;" onclick="startWithManual()">ЗАГРУЗИТЬ КАРТУ</button>
+      <input type="text" id="coords-input" placeholder="50.4501, 30.5234  (Киев)" />
+      <button class="start-btn" style="margin-top:10px;font-size:11px;padding:10px 28px;" onclick="startWithManual()">ЗАГРУЗИТЬ КАРТУ</button>
     </div>
-
-    <div id="loading-bar-wrap">
-        <div id="loading-bar"></div>
-    </div>
+    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
     <div id="loading-text">ЗАГРУЗКА ДАННЫХ OSM...</div>
-
-    <div class="start-specs">
-        ЛЕВЫЙ СТИК: ТЯГА / ПОВОРОТ<br>
-        ПРАВЫЙ СТИК: НАПРАВЛЕНИЕ<br>
-        ЗДАНИЯ И ДОРОГИ — ДАННЫЕ OpenStreetMap
-    </div>
-</div>
-```
-
+    <div class="start-specs">ЛЕВЫЙ СТИК: ТЯГА / ПОВОРОТ · ПРАВЫЙ: НАПРАВЛЕНИЕ<br>ЗДАНИЯ · ДОРОГИ · ТРАФИК · БОЕВЫЕ ЕДИНИЦЫ<br>КАРТА РАСШИРЯЕТСЯ ПО МЕРЕ ПОЛЁТА</div>
+  </div>
 </div>
 
 <div id="scanlines"></div>
 <div id="vignette"></div>
 <div id="chromatic"></div>
-
-<!-- LEFT OSD -->
+<div id="missile-warning"></div>
+<div id="chunk-indicator">▸ ЗАГРУЗКА НОВЫХ ДАННЫХ...</div>
 
 <div id="osd-left">
-    <div class="hud-label">FPV · REAL WORLD</div>
-    <div id="loc-info">LAT: --<br>LON: --</div>
-    <div id="mission-info">
-        <div class="hud-label">AREA</div>
-        <div class="mission-target" id="obj-type">---</div>
-        <div class="mission-dist" id="obj-dist">BLDG: 0</div>
-    </div>
-    <div id="god-status">⬡ OSM MODE</div>
+  <div class="hud-label">FPV · REAL WORLD</div>
+  <div id="loc-info">LAT: --<br>LON: --</div>
+  <div id="mission-info">
+    <div class="hud-label">PRIORITY TARGET</div>
+    <div class="mission-target" id="obj-type">ПОИСК...</div>
+    <div class="mission-dist" id="obj-dist">DST: ---</div>
+  </div>
+  <div id="god-status">⬡ COMBAT MODE</div>
 </div>
-
-<!-- HEADING -->
 
 <div id="heading-tape">
-    <div id="heading-inner">
-        <span>N</span><span>NE</span><span id="heading-deg">000°</span><span>SE</span><span>S</span>
-    </div>
+  <div id="heading-inner"><span>N</span><span>NE</span><span id="heading-deg">000°</span><span>SE</span><span>S</span></div>
 </div>
-
-<!-- ALT right -->
 
 <div id="alt-tape">
-    <div id="alt-border"></div>
-    <div class="tape-tick"><div class="tick-line" style="width:16px"></div><span class="tick-num" id="alt-t2">--</span></div>
-    <div style="height:10px"></div>
-    <div id="alt-big">0</div>
-    <div id="alt-unit">MTR</div>
-    <div style="height:10px"></div>
-    <div class="tape-tick"><div class="tick-line" style="width:10px"></div><span class="tick-num" id="alt-t1">--</span></div>
+  <div id="alt-border"></div>
+  <div class="tape-tick"><div class="tick-line" style="width:16px"></div><span class="tick-num" id="alt-t2">--</span></div>
+  <div style="height:10px"></div>
+  <div id="alt-big">0</div><div id="alt-unit">MTR</div>
+  <div style="height:10px"></div>
+  <div class="tape-tick"><div class="tick-line" style="width:10px"></div><span class="tick-num" id="alt-t1">--</span></div>
 </div>
-
-<!-- SPD left -->
 
 <div id="spd-tape">
-    <div id="spd-border"></div>
-    <div style="display:flex;align-items:center;justify-content:flex-start;padding-left:5px;gap:3px;width:100%">
-        <span class="tick-num-c" id="spd-t2">--</span><div class="tick-line-c" style="width:16px"></div>
-    </div>
-    <div style="height:10px"></div>
-    <div id="spd-big">0</div>
-    <div id="spd-unit">KMH</div>
-    <div style="height:10px"></div>
-    <div style="display:flex;align-items:center;justify-content:flex-start;padding-left:5px;gap:3px;width:100%">
-        <span class="tick-num-c" id="spd-t1">--</span><div class="tick-line-c" style="width:10px"></div>
-    </div>
+  <div id="spd-border"></div>
+  <div style="display:flex;align-items:center;justify-content:flex-start;padding-left:5px;gap:3px;width:100%">
+    <span class="tick-num-c" id="spd-t2">--</span><div class="tick-line-c" style="width:16px"></div>
+  </div>
+  <div style="height:10px"></div>
+  <div id="spd-big">0</div><div id="spd-unit">KMH</div>
+  <div style="height:10px"></div>
+  <div style="display:flex;align-items:center;justify-content:flex-start;padding-left:5px;gap:3px;width:100%">
+    <span class="tick-num-c" id="spd-t1">--</span><div class="tick-line-c" style="width:10px"></div>
+  </div>
 </div>
-
-<!-- MINIMAP -->
 
 <div id="osd-right">
-    <div id="minimap-container">
-        <canvas id="minimap-canvas"></canvas>
-        <div id="minimap-sweep"></div>
-        <div id="minimap-arrow"></div>
-    </div>
+  <div id="minimap-container">
+    <canvas id="minimap-canvas"></canvas>
+    <div id="minimap-sweep"></div>
+    <div id="minimap-arrow"></div>
+  </div>
 </div>
-
-<!-- CROSSHAIR -->
 
 <div id="crosshair">
-    <div class="ch-h left"></div><div class="ch-h right"></div>
-    <div class="ch-v top"></div><div class="ch-v bottom"></div>
-    <div class="ch-dot"></div>
+  <div class="ch-h left"></div><div class="ch-h right"></div>
+  <div class="ch-v top"></div><div class="ch-v bottom"></div>
+  <div class="ch-dot"></div>
 </div>
-
-<!-- TARGET UI -->
 
 <div id="target-ui">
-    <div id="target-inner">
-        <div class="corner tl"></div><div class="corner tr"></div>
-        <div class="corner bl"></div><div class="corner br"></div>
-        <div id="target-label">BLDG</div>
-        <div id="target-dist">0.0m</div>
-    </div>
+  <div id="target-inner">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+    <div id="target-label">LOCK</div>
+    <div id="target-dist">0.0m</div>
+  </div>
 </div>
 
-<!-- BOTTOM HUD -->
-
 <div id="bottom-hud">
-    <div class="status-pill" id="pill-sys">SYS: ONLINE</div>
-    <div class="status-pill blue" id="pill-bldg">BLDG: 0</div>
-    <div class="status-pill" id="pill-gps">GPS: LOCK</div>
-    <div class="status-pill hot" id="pill-alt">ALT: 60m</div>
+  <div class="status-pill" id="pill-sys">SYS: ONLINE</div>
+  <div class="status-pill blue" id="pill-bldg">BLDG: 0</div>
+  <div class="status-pill hot" id="pill-cars">CAR: 0</div>
+  <div class="status-pill warn" id="pill-threat">THREAT: HIGH</div>
+  <div class="status-pill purple" id="pill-uav">UAV: 0</div>
+  <div class="status-pill" id="pill-gps">GPS: LOCK</div>
 </div>
 
 <div id="joystick-left"></div>
@@ -257,11 +225,11 @@ canvas{display:block;}
 <div id="osm-credit">© OpenStreetMap contributors</div>
 
 <div id="restart-screen">
-    <div class="screen-content" id="screen-box">
-        <div id="res-msg">КРЭШ!</div>
-        <div id="res-sub">Врезался в здание</div>
-        <button onclick="location.reload()">ПЕРЕЗАПУСК</button>
-    </div>
+  <div class="screen-content" id="screen-box">
+    <div id="res-msg">КРЭШ!</div>
+    <div id="res-sub">Сигнал потерян</div>
+    <button onclick="location.reload()">ПЕРЕЗАПУСК</button>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -269,590 +237,775 @@ canvas{display:block;}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
 
 <script>
-// ═══════════════════════════════════════════════
-//   CONSTANTS & STATE
-// ═══════════════════════════════════════════════
-const PHYSICS={ acceleration:85, friction:0.97, rotationSpeed:3.5, tiltMax:0.7, lift:52 };
+// ══════════════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════════════
+const PHYSICS = { acceleration:85, friction:0.97, rotationSpeed:3.5, tiltMax:0.7, lift:52 };
 const METERS_PER_DEG_LAT = 111320;
+const DRONE_SCALE = 0.55;
+const TRACER_SPEED = 240;
+const CHUNK_RADIUS_M = 500;
+const CHUNK_TRIGGER_M = 250;
 
+// ══════════════════════════════════════════════════════
+//  SCENE
+// ══════════════════════════════════════════════════════
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x000a00, 0.004);
-const camera = new THREE.PerspectiveCamera(78, innerWidth/innerHeight, 0.5, 2000);
+scene.fog = new THREE.FogExp2(0x000a00, 0.0035);
+const camera = new THREE.PerspectiveCamera(78, innerWidth/innerHeight, 0.3, 2000);
 const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth, innerHeight);
+renderer.setSize(innerWidth,innerHeight);
 renderer.setClearColor(0x010a01,1);
 document.body.appendChild(renderer.domElement);
 
 const clock = new THREE.Clock();
 let isGameOver = false;
+let originLat=0, originLon=0, metersPerDegLon=111320;
 
-// World origin (lat/lon)
-let originLat = 0, originLon = 0;
-let metersPerDegLon = 111320; // will be recalculated
+const droneState = { pos:new THREE.Vector3(0,60,0), vel:new THREE.Vector3(), rotY:0, tiltX:0, tiltZ:0 };
+let droneGroup, payloadGroup, props=[];
+const tracers=[], particles=[], staticBuildings=[];
+const trailPoints=[], trailMax=80; let trailLine;
 
-// Drone
-const droneState = {
-    pos: new THREE.Vector3(0, 60, 0),
-    vel: new THREE.Vector3(),
-    rotY: 0, tiltX: 0, tiltZ: 0
-};
+// OSM road segments (waypoints) for car pathing
+const roadSegments=[];
+const roadsWithCars=new Set();
+const cars=[];
 
-let droneGroup, payloadGroup, props = [];
-const tracers = [], particles = [], staticBuildings = [];
-const trailPoints = [], trailMax = 80;
-let trailLine;
+// Combat entities: tanks, soldiers, enemy UAVs
+const entities=[];
+let currentMissionTarget=null;
 
-// Roads geometry
-const roadLines = [];
+// Path line (dashed) to priority target
+const pathLineGeo=new THREE.BufferGeometry();
+const pathLine=new THREE.Line(pathLineGeo,new THREE.LineDashedMaterial({color:0xffff00,dashSize:3,gapSize:2,transparent:true,opacity:0.65}));
+scene.add(pathLine);
 
-// ═══════════════════════════════════════════════
-//   START SCREEN LOGIC
-// ═══════════════════════════════════════════════
+// Dynamic chunk tracking
+const loadedZones=new Set();
+let lastChunkPos=new THREE.Vector3(0,0,0);
+let chunkLoadInProgress=false;
+let totalBldgCount=0;
+
+// ══════════════════════════════════════════════════════
+//  START SCREEN
+// ══════════════════════════════════════════════════════
 function showManualInput(){
-    document.getElementById('coords-input-wrap').style.display = 'block';
-    document.getElementById('btn-manual').style.display = 'none';
+  document.getElementById('coords-input-wrap').style.display='block';
+  document.getElementById('btn-manual').style.display='none';
 }
-
 function startWithGeo(){
-    const btn = document.getElementById('btn-geo');
-    btn.textContent = '📡 ОПРЕДЕЛЯЕМ...';
-    btn.disabled = true;
-    if(!navigator.geolocation){ alert('Геолокация недоступна'); return; }
-    navigator.geolocation.getCurrentPosition(
-        pos => loadMap(pos.coords.latitude, pos.coords.longitude),
-        err => {
-            btn.textContent = '❌ ОШИБКА GPS';
-            btn.disabled = false;
-            // Fallback to Moscow
-            alert('Не удалось получить геопозицию. Загружаем Москву.');
-            loadMap(55.7558, 37.6173);
-        },
-        {timeout:10000, enableHighAccuracy:true}
-    );
+  const btn=document.getElementById('btn-geo');
+  btn.textContent='📡 ОПРЕДЕЛЯЕМ...'; btn.disabled=true;
+  if(!navigator.geolocation){ loadMap(50.4501,30.5234); return; }
+  navigator.geolocation.getCurrentPosition(
+    p=>loadMap(p.coords.latitude,p.coords.longitude),
+    ()=>loadMap(50.4501,30.5234),   // fallback: Kyiv
+    {timeout:8000,enableHighAccuracy:true}
+  );
 }
-
 function startWithManual(){
-    const val = document.getElementById('coords-input').value.trim();
-    const parts = val.split(/[,\s]+/).filter(Boolean);
-    if(parts.length < 2){ alert('Введите координаты: широта, долгота'); return; }
-    const lat = parseFloat(parts[0]), lon = parseFloat(parts[1]);
-    if(isNaN(lat)||isNaN(lon)){ alert('Неверный формат'); return; }
-    loadMap(lat, lon);
+  const v=document.getElementById('coords-input').value.trim();
+  const p=v.split(/[,\s]+/).filter(Boolean);
+  if(p.length<2){alert('Введите: широта, долгота');return;}
+  const lat=parseFloat(p[0]),lon=parseFloat(p[1]);
+  if(isNaN(lat)||isNaN(lon)){alert('Неверный формат');return;}
+  loadMap(lat,lon);
 }
 
-async function loadMap(lat, lon){
-    originLat = lat;
-    originLon = lon;
-    metersPerDegLon = METERS_PER_DEG_LAT * Math.cos(lat * Math.PI/180);
+async function loadMap(lat,lon){
+  originLat=lat; originLon=lon;
+  metersPerDegLon=METERS_PER_DEG_LAT*Math.cos(lat*Math.PI/180);
+  ['btn-geo','btn-manual'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+  document.getElementById('coords-input-wrap').style.display='none';
+  document.getElementById('loading-bar-wrap').style.display='block';
+  document.getElementById('loading-text').style.display='block';
+  const sp=document.querySelector('.start-specs'); if(sp) sp.style.display='none';
+  setBar(8,'ЗАПРОС К OVERPASS API...');
+  try{
+    const data=await fetchOSM(lat,lon,CHUNK_RADIUS_M);
+    setBar(55,'СТРОИМ СЦЕНУ...');
+    await buildScene(data);
+    setBar(88,'СОЗДАЁМ МИР...');
+    createGroundPlane(); createDetailedDrone(); initTrail(); setupJoysticks();
+    setBar(100,'ГОТОВО'); await delay(300);
+    document.getElementById('start-prompt').style.display='none';
+    document.getElementById('loc-info').innerHTML=`LAT: ${lat.toFixed(4)}<br>LON: ${lon.toFixed(4)}`;
+    markZoneLoaded(lat,lon);
+    spawnInitialEntities();
+    initAudio(); animate();
+  }catch(e){
+    console.error(e);
+    setBar(0,'❌ ОШИБКА → DEMO');
+    setTimeout(()=>{
+      createFallbackScene(); createGroundPlane(); createDetailedDrone(); initTrail(); setupJoysticks();
+      document.getElementById('start-prompt').style.display='none';
+      spawnInitialEntities(); initAudio(); animate();
+    },1500);
+  }
+}
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+function setBar(p,t){document.getElementById('loading-bar').style.width=p+'%';document.getElementById('loading-text').textContent=t;}
 
-    // Show loading
-    document.getElementById('btn-geo').style.display = 'none';
-    document.getElementById('btn-manual').style.display = 'none';
-    document.getElementById('coords-input-wrap').style.display = 'none';
-    document.getElementById('loading-bar-wrap').style.display = 'block';
-    document.getElementById('loading-text').style.display = 'block';
-    document.querySelector('.start-specs').style.display = 'none';
-
-    setLoadingBar(10, 'ЗАПРОС К OVERPASS API...');
-
-    try {
-        const radius = 600; // meters — area to load
-        const data = await fetchOSM(lat, lon, radius);
-        setLoadingBar(60, 'ОБРАБОТКА ЗДАНИЙ...');
-        await buildScene(data);
-        setLoadingBar(90, 'ГЕНЕРАЦИЯ МИРА...');
-        createGroundPlane();
-        createDetailedDrone();
-        initTrail();
-        setupJoysticks();
-        setLoadingBar(100, 'ГОТОВО');
-        await delay(400);
-        document.getElementById('start-prompt').style.display = 'none';
-        document.getElementById('loc-info').innerHTML = `LAT: ${lat.toFixed(4)}<br>LON: ${lon.toFixed(4)}`;
-        initAudio();
-        animate();
-    } catch(e) {
-        console.error(e);
-        setLoadingBar(0, '❌ ОШИБКА: ' + e.message);
-        // Fallback to demo
-        setTimeout(()=>{
-            setLoadingBar(50, 'ЗАГРУЗКА DEMO СЦЕНЫ...');
-            createFallbackScene();
-            createGroundPlane();
-            createDetailedDrone();
-            initTrail();
-            setupJoysticks();
-            document.getElementById('start-prompt').style.display = 'none';
-            initAudio();
-            animate();
-        }, 1500);
-    }
+// ══════════════════════════════════════════════════════
+//  OSM FETCH
+// ══════════════════════════════════════════════════════
+async function fetchOSM(lat,lon,r){
+  const dLat=r/METERS_PER_DEG_LAT, dLon=r/metersPerDegLon;
+  const S=lat-dLat,N=lat+dLat,W=lon-dLon,E=lon+dLon;
+  const q=`[out:json][timeout:25][bbox:${S},${W},${N},${E}];(way["building"];way["highway"~"^(primary|secondary|tertiary|residential|service|unclassified)$"];way["waterway"];way["leisure"="park"];);out geom;`;
+  const res=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});
+  if(!res.ok) throw new Error('Overpass '+res.status);
+  return res.json();
 }
 
-function setLoadingBar(pct, text){
-    document.getElementById('loading-bar').style.width = pct + '%';
-    document.getElementById('loading-text').textContent = text;
-}
-const delay = ms => new Promise(r => setTimeout(r, ms));
+// ══════════════════════════════════════════════════════
+//  DYNAMIC ZONE LOADING
+// ══════════════════════════════════════════════════════
+function zoneKey(lat,lon){return `${(lat*250|0)}_${(lon*250|0)}`;}
+function markZoneLoaded(lat,lon){loadedZones.add(zoneKey(lat,lon));}
 
-// ═══════════════════════════════════════════════
-//   OSM DATA FETCH
-// ═══════════════════════════════════════════════
-async function fetchOSM(lat, lon, radiusM){
-    // bounding box in degrees
-    const dLat = radiusM / METERS_PER_DEG_LAT;
-    const dLon = radiusM / metersPerDegLon;
-    const S = lat-dLat, N = lat+dLat, W = lon-dLon, E = lon+dLon;
-
-    const query = `
-[out:json][timeout:30][bbox:${S},${W},${N},${E}];
-(
-  way["building"];
-  way["highway"~"^(primary|secondary|tertiary|residential|service|footway|path|unclassified)$"];
-  way["waterway"];
-  way["leisure"="park"];
-);
-out geom;
-`;
-    const resp = await fetch('https://overpass-api.de/api/interpreter', {
-        method:'POST',
-        body:'data=' + encodeURIComponent(query)
-    });
-    if(!resp.ok) throw new Error('Overpass HTTP ' + resp.status);
-    return await resp.json();
+async function checkAndLoadNewZone(){
+  if(chunkLoadInProgress) return;
+  if(droneState.pos.distanceTo(lastChunkPos)<CHUNK_TRIGGER_M) return;
+  const curLat=originLat+(-droneState.pos.z/METERS_PER_DEG_LAT);
+  const curLon=originLon+(droneState.pos.x/metersPerDegLon);
+  if(loadedZones.has(zoneKey(curLat,curLon))) return;
+  chunkLoadInProgress=true; lastChunkPos.copy(droneState.pos);
+  const ci=document.getElementById('chunk-indicator'); ci.classList.add('show');
+  try{
+    const data=await fetchOSM(curLat,curLon,CHUNK_RADIUS_M);
+    await buildScene(data);
+    markZoneLoaded(curLat,curLon);
+    // Spawn extra entities in new zone
+    spawnEntitiesAround(droneState.pos.x+(Math.random()-.5)*300, droneState.pos.z+(Math.random()-.5)*300);
+  }catch(e){console.warn('Zone fail',e);}
+  chunkLoadInProgress=false;
+  setTimeout(()=>ci.classList.remove('show'),800);
 }
 
-// ═══════════════════════════════════════════════
-//   GEO → LOCAL COORDS
-// ═══════════════════════════════════════════════
-function geoToLocal(lat, lon){
-    const x = (lon - originLon) * metersPerDegLon;
-    const z = -(lat - originLat) * METERS_PER_DEG_LAT; // negate: north = -z in Three.js
-    return {x, z};
+// ══════════════════════════════════════════════════════
+//  GEO → LOCAL
+// ══════════════════════════════════════════════════════
+function geo2local(lat,lon){return{x:(lon-originLon)*metersPerDegLon, z:-(lat-originLat)*METERS_PER_DEG_LAT};}
+function triPoly(pts){
+  const v=[]; if(pts.length<3)return v; const p0=pts[0];
+  for(let i=1;i<pts.length-1;i++) v.push(p0.x,0,p0.z,pts[i].x,0,pts[i].z,pts[i+1].x,0,pts[i+1].z);
+  return v;
 }
 
-// Simple ear-clip triangulation for convex polygons (good enough for buildings)
-function triangulatePolygon(pts2d){
-    // pts2d = [{x,z}]
-    const verts = [];
-    if(pts2d.length < 3) return verts;
-    // Fan triangulation (works for convex or mostly-convex shapes)
-    const p0 = pts2d[0];
-    for(let i=1;i<pts2d.length-1;i++){
-        verts.push(p0.x, 0, p0.z);
-        verts.push(pts2d[i].x, 0, pts2d[i].z);
-        verts.push(pts2d[i+1].x, 0, pts2d[i+1].z);
-    }
-    return verts;
-}
-
-// ═══════════════════════════════════════════════
-//   BUILD 3D SCENE FROM OSM DATA
-// ═══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+//  BUILD SCENE FROM OSM DATA
+// ══════════════════════════════════════════════════════
 async function buildScene(data){
-    const elements = data.elements || [];
-    let bldgCount = 0;
-
-    // Node lookup
-    const nodeMap = {};
-    elements.forEach(el=>{ if(el.type==='node') nodeMap[el.id]={lat:el.lat,lon:el.lon}; });
-
-    for(const el of elements){
-        if(el.type !== 'way' || !el.geometry) continue;
-        const tags = el.tags || {};
-
-        // Get polygon points
-        const pts = el.geometry.map(g => geoToLocal(g.lat, g.lon));
-        if(pts.length < 2) continue;
-
-        // ── BUILDINGS ──
-        if(tags.building){
-            const levels = parseInt(tags['building:levels'] || tags['level'] || '3');
-            const heightTag = parseFloat(tags.height || tags['building:height'] || '0');
-            const h = heightTag > 0 ? heightTag : levels * 3.2 + 1;
-
-            // Close polygon
-            const poly = [...pts];
-            if(poly[0].x!==poly[poly.length-1].x || poly[0].z!==poly[poly.length-1].z) poly.push(poly[0]);
-
-            spawnOSMBuilding(poly, h);
-            bldgCount++;
-        }
-        // ── ROADS ──
-        else if(tags.highway){
-            const col = tags.highway.includes('primary')||tags.highway.includes('secondary') ? 0x00aa44 :
-                        tags.highway.includes('foot')||tags.highway.includes('path') ? 0x226622 : 0x004422;
-            const linePts = pts.map(p => new THREE.Vector3(p.x, 0.2, p.z));
-            if(linePts.length >= 2){
-                const geo = new THREE.BufferGeometry().setFromPoints(linePts);
-                const line = new THREE.Line(geo, new THREE.LineBasicMaterial({color:col,transparent:true,opacity:0.55}));
-                scene.add(line);
-            }
-        }
-        // ── WATER ──
-        else if(tags.waterway || tags.natural==='water'){
-            const linePts = pts.map(p => new THREE.Vector3(p.x, 0.1, p.z));
-            if(linePts.length >= 2){
-                const geo = new THREE.BufferGeometry().setFromPoints(linePts);
-                const line = new THREE.Line(geo, new THREE.LineBasicMaterial({color:0x0088aa,transparent:true,opacity:0.6}));
-                scene.add(line);
-            }
-        }
-        // ── PARKS ──
-        else if(tags.leisure==='park' && pts.length >= 3){
-            const poly = [...pts];
-            if(poly[0].x!==poly[poly.length-1].x || poly[0].z!==poly[poly.length-1].z) poly.push(poly[0]);
-            const verts = triangulatePolygon(poly);
-            if(verts.length >= 9){
-                const geo = new THREE.BufferGeometry();
-                geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-                const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({color:0x003300,transparent:true,opacity:0.4,side:THREE.DoubleSide}));
-                scene.add(mesh);
-                // Park outline
-                const outlinePts = pts.map(p => new THREE.Vector3(p.x, 0.15, p.z));
-                const oGeo = new THREE.BufferGeometry().setFromPoints(outlinePts);
-                scene.add(new THREE.Line(oGeo, new THREE.LineBasicMaterial({color:0x00aa33,transparent:true,opacity:0.5})));
-            }
-        }
+  const els=data.elements||[];
+  for(const el of els){
+    if(el.type!=='way'||!el.geometry) continue;
+    const tags=el.tags||{};
+    const pts=el.geometry.map(g=>geo2local(g.lat,g.lon));
+    if(pts.length<2) continue;
+    if(tags.building){
+      const lv=parseInt(tags['building:levels']||'3');
+      const ht=parseFloat(tags.height||'0');
+      const h=ht>0?ht:lv*3.2+1;
+      const poly=[...pts];
+      if(poly[0].x!==poly[poly.length-1].x||poly[0].z!==poly[poly.length-1].z) poly.push(poly[0]);
+      spawnOSMBuilding(poly,h);
+      totalBldgCount++;
+    } else if(tags.highway){
+      const isPrimary=tags.highway==='primary'||tags.highway==='secondary';
+      const col=isPrimary?0x00cc55:tags.highway==='tertiary'?0x008833:0x004422;
+      const linePts=pts.map(p=>new THREE.Vector3(p.x,0.18,p.z));
+      if(linePts.length>=2) scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(linePts),new THREE.LineBasicMaterial({color:col,transparent:true,opacity:0.55})));
+      if(tags.highway!=='footway'&&tags.highway!=='path'&&pts.length>=2)
+        roadSegments.push({pts:[...pts],type:tags.highway,isPrimary});
+    } else if(tags.waterway||tags.natural==='water'){
+      const linePts=pts.map(p=>new THREE.Vector3(p.x,0.08,p.z));
+      if(linePts.length>=2) scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(linePts),new THREE.LineBasicMaterial({color:0x0099bb,transparent:true,opacity:0.6})));
+    } else if(tags.leisure==='park'&&pts.length>=3){
+      const poly=[...pts];
+      if(poly[0].x!==poly[poly.length-1].x||poly[0].z!==poly[poly.length-1].z) poly.push(poly[0]);
+      const v=triPoly(poly);
+      if(v.length>=9){
+        const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+        scene.add(new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x002800,transparent:true,opacity:0.4,side:THREE.DoubleSide})));
+        scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(p.x,0.12,p.z))),new THREE.LineBasicMaterial({color:0x00bb33,transparent:true,opacity:0.5})));
+      }
     }
-
-    document.getElementById('obj-dist').textContent = `BLDG: ${bldgCount}`;
-    document.getElementById('pill-bldg').textContent = `BLDG: ${bldgCount}`;
+  }
+  spawnCarsOnNewRoads();
+  const bEl=document.getElementById('obj-dist'); if(bEl&&!currentMissionTarget) bEl.textContent=`DST: ---`;
+  const pEl=document.getElementById('pill-bldg'); if(pEl) pEl.textContent=`BLDG: ${totalBldgCount}`;
 }
 
-function spawnOSMBuilding(pts, h){
-    if(pts.length < 3) return;
-    const grp = new THREE.Group();
-
-    // Floor plan centroid
-    let cx=0, cz=0;
-    pts.forEach(p=>{cx+=p.x;cz+=p.z;}); cx/=pts.length; cz/=pts.length;
-
-    // Dark-green fill — extrude walls as quads
-    const wallMat = new THREE.MeshBasicMaterial({color:0x002200,transparent:true,opacity:0.6,side:THREE.DoubleSide});
-    const edgeMat = new THREE.LineBasicMaterial({color:0x00ff66,transparent:true,opacity:0.85});
-
-    for(let i=0;i<pts.length-1;i++){
-        const a = pts[i], b = pts[i+1];
-        // Wall quad
-        const wallVerts = new Float32Array([
-            a.x,0,a.z,  b.x,0,b.z,  b.x,h,b.z,
-            a.x,0,a.z,  b.x,h,b.z,  a.x,h,a.z
-        ]);
-        const wallGeo = new THREE.BufferGeometry();
-        wallGeo.setAttribute('position', new THREE.Float32BufferAttribute(wallVerts,3));
-        grp.add(new THREE.Mesh(wallGeo, wallMat));
-
-        // Edge lines (vertical + horizontal)
-        const edgePts = [
-            new THREE.Vector3(a.x,0,a.z), new THREE.Vector3(a.x,h,a.z),
-            new THREE.Vector3(b.x,h,b.z), new THREE.Vector3(b.x,0,b.z)
-        ];
-        const eGeo = new THREE.BufferGeometry().setFromPoints(edgePts);
-        grp.add(new THREE.Line(eGeo, edgeMat));
-    }
-
-    // Roof outline (top edges)
-    const roofPts = pts.map(p => new THREE.Vector3(p.x,h,p.z));
-    const rGeo = new THREE.BufferGeometry().setFromPoints(roofPts);
-    grp.add(new THREE.Line(rGeo, new THREE.LineBasicMaterial({color:0x44ffaa,transparent:true,opacity:0.7})));
-
-    // Floor outline
-    const floorPts = pts.map(p => new THREE.Vector3(p.x,0.1,p.z));
-    const fGeo = new THREE.BufferGeometry().setFromPoints(floorPts);
-    grp.add(new THREE.Line(fGeo, new THREE.LineBasicMaterial({color:0x226622,transparent:true,opacity:0.4})));
-
-    // Roof fill (fan triangulation)
-    const roofVerts = triangulatePolygon(pts);
-    if(roofVerts.length >= 9){
-        const topVerts = [];
-        for(let i=0;i<roofVerts.length;i+=3) topVerts.push(roofVerts[i],h,roofVerts[i+2]);
-        const rFillGeo = new THREE.BufferGeometry();
-        rFillGeo.setAttribute('position', new THREE.Float32BufferAttribute(topVerts,3));
-        grp.add(new THREE.Mesh(rFillGeo, new THREE.MeshBasicMaterial({color:0x001800,transparent:true,opacity:0.7,side:THREE.DoubleSide})));
-    }
-
-    scene.add(grp);
-
-    // Collision box: bounding rect
-    let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
-    pts.forEach(p=>{if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.z<minZ)minZ=p.z;if(p.z>maxZ)maxZ=p.z;});
-    staticBuildings.push({
-        cx:(minX+maxX)/2, cz:(minZ+maxZ)/2,
-        hw:(maxX-minX)/2+0.5, hd:(maxZ-minZ)/2+0.5,
-        height:h, mesh:grp,
-        pts // for precise 2D polygon check
-    });
+// ══════════════════════════════════════════════════════
+//  BUILDINGS
+// ══════════════════════════════════════════════════════
+function spawnOSMBuilding(pts,h){
+  if(pts.length<3) return;
+  const grp=new THREE.Group();
+  const wallMat=new THREE.MeshBasicMaterial({color:0x002200,transparent:true,opacity:0.6,side:THREE.DoubleSide});
+  const edgeMat=new THREE.LineBasicMaterial({color:0x00ff66,transparent:true,opacity:0.88});
+  for(let i=0;i<pts.length-1;i++){
+    const a=pts[i],b=pts[i+1];
+    const wv=new Float32Array([a.x,0,a.z,b.x,0,b.z,b.x,h,b.z,a.x,0,a.z,b.x,h,b.z,a.x,h,a.z]);
+    const wg=new THREE.BufferGeometry(); wg.setAttribute('position',new THREE.Float32BufferAttribute(wv,3));
+    grp.add(new THREE.Mesh(wg,wallMat));
+    grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(a.x,0,a.z),new THREE.Vector3(a.x,h,a.z),new THREE.Vector3(b.x,h,b.z),new THREE.Vector3(b.x,0,b.z)]),edgeMat));
+  }
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(p.x,h,p.z))),new THREE.LineBasicMaterial({color:0x44ffaa,transparent:true,opacity:0.7})));
+  grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(p.x,0.1,p.z))),new THREE.LineBasicMaterial({color:0x226622,transparent:true,opacity:0.4})));
+  const tv=triPoly(pts);
+  if(tv.length>=9){
+    const topV=[]; for(let i=0;i<tv.length;i+=3)topV.push(tv[i],h,tv[i+2]);
+    const tg=new THREE.BufferGeometry(); tg.setAttribute('position',new THREE.Float32BufferAttribute(topV,3));
+    grp.add(new THREE.Mesh(tg,new THREE.MeshBasicMaterial({color:0x001800,transparent:true,opacity:0.7,side:THREE.DoubleSide})));
+  }
+  const vMat=new THREE.LineBasicMaterial({color:0x44ffaa,transparent:true,opacity:0.6});
+  pts.slice(0,pts.length-1).forEach(p=>grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p.x,0,p.z),new THREE.Vector3(p.x,h,p.z)]),vMat)));
+  scene.add(grp);
+  let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity;
+  pts.forEach(p=>{if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.z<minZ)minZ=p.z;if(p.z>maxZ)maxZ=p.z;});
+  staticBuildings.push({cx:(minX+maxX)/2,cz:(minZ+maxZ)/2,hw:(maxX-minX)/2+0.4,hd:(maxZ-minZ)/2+0.4,height:h,mesh:grp,pts});
 }
 
-// ─── FALLBACK DEMO SCENE ────────────────────────────
+// ══════════════════════════════════════════════════════
+//  CARS ON ROADS
+// ══════════════════════════════════════════════════════
+function buildCarMesh(col){
+  const grp=new THREE.Group(), mat=new THREE.MeshBasicMaterial({color:col,wireframe:true});
+  grp.add(new THREE.Mesh(new THREE.BoxGeometry(2.0,.85,4.0),mat));
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(1.6,.65,2.0),mat); cab.position.set(0,.72,-.3); grp.add(cab);
+  const wm=new THREE.MeshBasicMaterial({color:0x222200,wireframe:true});
+  [[-1.05,-.42,1.3],[1.05,-.42,1.3],[-1.05,-.42,-1.3],[1.05,-.42,-1.3]].forEach(p=>{const w=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,.25,7),wm);w.rotation.z=Math.PI/2;w.position.set(...p);grp.add(w);});
+  const lm=new THREE.MeshBasicMaterial({color:0xffffcc,transparent:true,opacity:.85});
+  [[-0.6,0,2.05],[0.6,0,2.05]].forEach(p=>{const l=new THREE.Mesh(new THREE.BoxGeometry(.2,.16,.07),lm);l.position.set(...p);grp.add(l);});
+  return grp;
+}
+
+function spawnCarsOnNewRoads(){
+  for(let si=0;si<roadSegments.length&&cars.length<80;si++){
+    if(roadsWithCars.has(si)) continue;
+    const seg=roadSegments[si]; if(seg.pts.length<2) continue;
+    const num=seg.isPrimary?Math.floor(Math.random()*2)+1:(Math.random()<.4?1:0);
+    for(let c=0;c<num;c++){
+      const startIdx=Math.floor(Math.random()*(seg.pts.length-1));
+      const p=seg.pts[startIdx];
+      const col=Math.random()<.35?0xff6600:Math.random()<.5?0x0088ff:0xffcc00;
+      const mesh=buildCarMesh(col); mesh.position.set(p.x,.42,p.z); scene.add(mesh);
+      cars.push({mesh,segIdx:si,wpIdx:startIdx,speed:(seg.isPrimary?12:8)+Math.random()*8,progress:0,isStopped:false,stopTimer:0,laneOffset:(Math.random()-.5)*.6});
+    }
+    roadsWithCars.add(si);
+  }
+}
+
+function updateCars(dt){
+  for(let i=cars.length-1;i>=0;i--){
+    const c=cars[i]; const seg=roadSegments[c.segIdx];
+    if(!seg){scene.remove(c.mesh);cars.splice(i,1);continue;}
+    if(c.isStopped){c.stopTimer-=dt;if(c.stopTimer<=0)c.isStopped=false;continue;}
+    if(Math.random()<.003){c.isStopped=true;c.stopTimer=1+Math.random()*3;continue;}
+    const pts=seg.pts; const a=pts[c.wpIdx],b=pts[c.wpIdx+1];
+    if(!a||!b){c.wpIdx=0;continue;}
+    const segLen=Math.sqrt((b.x-a.x)**2+(b.z-a.z)**2); if(segLen<0.1){c.wpIdx++;if(c.wpIdx>=pts.length-1)c.wpIdx=0;continue;}
+    c.progress+=c.speed*dt/segLen;
+    if(c.progress>=1){c.progress=0;c.wpIdx++;if(c.wpIdx>=pts.length-1)c.wpIdx=0;}
+    const aa=pts[c.wpIdx]||pts[0],bb=pts[Math.min(c.wpIdx+1,pts.length-1)]||pts[0];
+    const px=aa.x+(bb.x-aa.x)*c.progress, pz=aa.z+(bb.z-aa.z)*c.progress;
+    const dx=bb.x-aa.x,dz=bb.z-aa.z,len=Math.sqrt(dx*dx+dz*dz)||1;
+    const nx=-dz/len,nz=dx/len;
+    c.mesh.position.set(px+nx*c.laneOffset,.42,pz+nz*c.laneOffset);
+    c.mesh.rotation.set(0,Math.atan2(dx,dz),0);
+  }
+  const el=document.getElementById('pill-cars'); if(el) el.textContent=`CAR: ${cars.length}`;
+}
+
+// ══════════════════════════════════════════════════════
+//  COMBAT ENTITIES: TANKS / SOLDIERS / UAVs
+// ══════════════════════════════════════════════════════
+function spawnInitialEntities(){
+  // Spread entities across starting area
+  for(let i=0;i<6;i++) spawnTank((Math.random()-.5)*400,(Math.random()-.5)*400);
+  for(let i=0;i<12;i++) spawnSoldier((Math.random()-.5)*300,(Math.random()-.5)*300);
+  for(let i=0;i<5;i++) spawnEnemyUAV((Math.random()-.5)*500,(Math.random()-.5)*500);
+}
+
+function spawnEntitiesAround(x,z){
+  for(let i=0;i<3;i++) spawnTank(x+(Math.random()-.5)*300,z+(Math.random()-.5)*300);
+  for(let i=0;i<6;i++) spawnSoldier(x+(Math.random()-.5)*200,z+(Math.random()-.5)*200);
+  for(let i=0;i<2;i++) spawnEnemyUAV(x+(Math.random()-.5)*400,z+(Math.random()-.5)*400);
+}
+
+function spawnTank(x,z){
+  const grp=new THREE.Group();
+  const mat=new THREE.MeshBasicMaterial({color:0xff2200,wireframe:true});
+  grp.add(new THREE.Mesh(new THREE.BoxGeometry(5,1.5,8),mat));
+  const t2=new THREE.Mesh(new THREE.BoxGeometry(3,1,4),mat); t2.position.y=1.2; grp.add(t2);
+  const bar=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,3,6),mat); bar.position.set(0,1.8,2.5); bar.rotation.x=Math.PI/2; grp.add(bar);
+  const glow=new THREE.Mesh(new THREE.SphereGeometry(.5,6,6),new THREE.MeshBasicMaterial({color:0xff4400,transparent:true,opacity:.55})); glow.position.y=2; grp.add(glow);
+  grp.position.set(x,.75,z); scene.add(grp);
+  entities.push({mesh:grp,type:'tank',radius:4,height:2.5,side:'hostile',speed:12,
+    dir:new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0),Math.random()*Math.PI*2),lastFire:0});
+}
+
+function spawnSoldier(x,z){
+  const mat=new THREE.MeshBasicMaterial({color:0xff2200,wireframe:true});
+  const grp=new THREE.Group();
+  grp.add(new THREE.Mesh(new THREE.BoxGeometry(.6,1.2,.5),mat));
+  const head=new THREE.Mesh(new THREE.BoxGeometry(.45,.45,.45),mat); head.position.y=.85; grp.add(head);
+  const gun=new THREE.Mesh(new THREE.BoxGeometry(.08,.08,.8),mat); gun.position.set(.3,.2,.3); grp.add(gun);
+  grp.position.set(x,.9,z); scene.add(grp);
+  entities.push({mesh:grp,type:'soldier',radius:.8,height:1.8,side:'hostile',speed:5,
+    dir:new THREE.Vector3(Math.random()-.5,0,Math.random()-.5).normalize(),lastFire:0});
+}
+
+function buildUAVMesh(size,color){
+  const grp=new THREE.Group(),mat=new THREE.MeshBasicMaterial({color,wireframe:true});
+  const a1=new THREE.Mesh(new THREE.BoxGeometry(size*1.6,.04*size,.04*size),mat); a1.rotation.y=Math.PI/4;
+  const a2=new THREE.Mesh(new THREE.BoxGeometry(size*1.6,.04*size,.04*size),mat); a2.rotation.y=-Math.PI/4;
+  grp.add(a1,a2,new THREE.Mesh(new THREE.BoxGeometry(size*.35,size*.2,size*.4),mat));
+  [[size*.55,0,size*.55],[-(size*.55),0,size*.55],[size*.55,0,-(size*.55)],[-(size*.55),0,-(size*.55)]].forEach(p=>{
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(size*.3,.018*size,5,14),mat); ring.position.set(...p); ring.rotation.x=Math.PI/2; grp.add(ring);
+  });
+  const pay=new THREE.Mesh(new THREE.CylinderGeometry(size*.06,size*.06,size*.4,7),mat); pay.rotation.x=Math.PI/2; pay.position.y=-size*.2; grp.add(pay);
+  return grp;
+}
+
+function spawnEnemyUAV(x,z){
+  const size=0.6+Math.random()*.8;
+  const flyH=40+Math.random()*80;
+  const mesh=buildUAVMesh(size,0xff3300); mesh.position.set(x,flyH,z); scene.add(mesh);
+  const wpCount=3+Math.floor(Math.random()*3), waypoints=[];
+  for(let i=0;i<wpCount;i++){
+    const angle=(i/wpCount)*Math.PI*2+Math.random()*.5,rad=80+Math.random()*200;
+    waypoints.push(new THREE.Vector3(x+Math.cos(angle)*rad,flyH+(Math.random()-.5)*25,z+Math.sin(angle)*rad));
+  }
+  const uavProps=[]; mesh.traverse(c=>{if(c instanceof THREE.Mesh&&c.geometry instanceof THREE.TorusGeometry)uavProps.push(c);});
+  entities.push({mesh,type:'uav',radius:1.5*size,height:.6*size,side:'hostile',speed:18+Math.random()*28,
+    waypoints,wpIdx:0,dir:new THREE.Vector3(0,0,1),lastFire:0,props:uavProps});
+}
+
+// ══════════════════════════════════════════════════════
+//  AVOIDANCE (ground entities only)
+// ══════════════════════════════════════════════════════
+function applyAvoidance(en){
+  if(en.type==='uav') return;
+  for(const b of staticBuildings){
+    const dx=en.mesh.position.x-b.cx, dz=en.mesh.position.z-b.cz;
+    const dist=Math.sqrt(dx*dx+dz*dz);
+    if(dist<(en.type==='tank'?25:12)+Math.max(b.hw,b.hd)){
+      const toB=new THREE.Vector3(b.cx-en.mesh.position.x,0,b.cz-en.mesh.position.z).normalize();
+      if(toB.dot(en.dir)>.5){
+        const left=new THREE.Vector3(-en.dir.z,0,en.dir.x);
+        en.dir.addScaledVector(toB.dot(left)>0?left.negate():left,.2).normalize();
+      }
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  TRACERS
+// ══════════════════════════════════════════════════════
+function createTracer(start,target,color){
+  const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,-8)]);
+  const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color,transparent:true,opacity:.9}));
+  line.position.copy(start); line.lookAt(target); scene.add(line);
+  tracers.push({mesh:line,dir:target.clone().sub(start).normalize(),life:1.2});
+  playGunshot(.025);
+}
+
+// ══════════════════════════════════════════════════════
+//  UPDATE ENTITIES
+// ══════════════════════════════════════════════════════
+function updateEntities(dt,time){
+  entities.forEach(en=>{
+    if(en.type==='tank'){
+      applyAvoidance(en);
+      en.mesh.position.addScaledVector(en.dir,en.speed*dt);
+      en.mesh.position.y=.75;
+      en.mesh.lookAt(en.mesh.position.clone().add(en.dir));
+      if(time>en.lastFire){createTracer(en.mesh.position.clone().add(new THREE.Vector3(0,1.5,0)),droneState.pos,0xff5500);en.lastFire=time+3+Math.random();}
+    } else if(en.type==='soldier'){
+      applyAvoidance(en);
+      en.mesh.position.addScaledVector(en.dir,en.speed*dt);
+      en.mesh.position.y=.9;
+      if(time>en.lastFire&&droneState.pos.distanceTo(en.mesh.position)<200){
+        createTracer(en.mesh.position.clone().add(new THREE.Vector3(0,1,0)),droneState.pos,0xffaa00);
+        en.lastFire=time+1+Math.random()*2;
+      }
+    } else if(en.type==='uav'){
+      if(en.waypoints&&en.waypoints.length>0){
+        const wp=en.waypoints[en.wpIdx];
+        const toWp=wp.clone().sub(en.mesh.position);
+        if(toWp.length()<12) en.wpIdx=(en.wpIdx+1)%en.waypoints.length;
+        else en.dir.lerp(toWp.normalize(),.04).normalize();
+      }
+      en.mesh.position.addScaledVector(en.dir,en.speed*dt);
+      en.mesh.lookAt(en.mesh.position.clone().add(en.dir));
+      if(en.props) en.props.forEach((p,i)=>p.rotation.z+=(i%2===0?1:-1)*dt*14);
+      if(time>en.lastFire&&droneState.pos.distanceTo(en.mesh.position)<220){
+        createTracer(en.mesh.position.clone(),droneState.pos,0xff3300);
+        en.lastFire=time+1.5+Math.random()*2;
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  MISSION — PRIORITY TARGET + DASHED PATH LINE
+// ══════════════════════════════════════════════════════
+function updateMission(){
+  if(!currentMissionTarget||entities.indexOf(currentMissionTarget)===-1){
+    const targets=entities.filter(e=>e.side==='hostile');
+    if(targets.length>0) currentMissionTarget=targets[Math.floor(Math.random()*targets.length)];
+    else { pathLineGeo.setFromPoints([]); return; }
+  }
+  const dist=droneState.pos.distanceTo(currentMissionTarget.mesh.position);
+  document.getElementById('obj-type').textContent=currentMissionTarget.type.toUpperCase();
+  document.getElementById('obj-dist').textContent=`DST: ${dist.toFixed(0)}m`;
+  // Build dashed path
+  const pts=[];
+  for(let i=0;i<=20;i++){
+    const a=i/20;
+    const p=new THREE.Vector3().lerpVectors(droneState.pos,currentMissionTarget.mesh.position,a);
+    if(p.y<1) p.y=1;
+    pts.push(p);
+  }
+  pathLineGeo.setFromPoints(pts); pathLine.computeLineDistances();
+}
+
+// ══════════════════════════════════════════════════════
+//  TARGET SEEKER (nearest hostile in camera FOV)
+// ══════════════════════════════════════════════════════
+function updateSeeker(){
+  let best=null,minD=300;
+  const ui=document.getElementById('target-ui');
+  // Include entities AND cars
+  const allTargets=[...entities,...cars.map(c=>({mesh:c.mesh,type:'car',side:'neutral',radius:2}))];
+  allTargets.forEach(en=>{
+    const dist=droneState.pos.distanceTo(en.mesh.position);
+    if(dist<minD){
+      const p=en.mesh.position.clone().project(camera);
+      if(Math.abs(p.z)<1&&Math.abs(p.x)<.85&&Math.abs(p.y)<.85){
+        minD=dist; best={x:(p.x*.5+.5)*innerWidth,y:(p.y*-.5+.5)*innerHeight,type:en.type,dist,target:en};
+      }
+    }
+  });
+  if(best){
+    ui.style.display='block'; ui.style.left=best.x+'px'; ui.style.top=best.y+'px';
+    ui.className=best.target===currentMissionTarget?'priority':'';
+    document.getElementById('target-label').textContent=best.type.toUpperCase();
+    document.getElementById('target-dist').textContent=`${best.dist.toFixed(0)}m`;
+  } else ui.style.display='none';
+}
+
+// ══════════════════════════════════════════════════════
+//  FALLBACK DEMO
+// ══════════════════════════════════════════════════════
 function createFallbackScene(){
-    // Generate procedural city if OSM fails
-    for(let i=0;i<40;i++){
-        const x=(Math.random()-.5)*500, z=(Math.random()-.5)*500;
-        const w=10+Math.random()*25, h=8+Math.random()*40, d=10+Math.random()*25;
-        const pts=[{x:x-w/2,z:z-d/2},{x:x+w/2,z:z-d/2},{x:x+w/2,z:z+d/2},{x:x-w/2,z:z+d/2},{x:x-w/2,z:z-d/2}];
-        spawnOSMBuilding(pts, h);
-    }
-    document.getElementById('obj-type').textContent = 'DEMO MODE';
+  for(let i=0;i<40;i++){
+    const x=(Math.random()-.5)*500,z=(Math.random()-.5)*500,w=10+Math.random()*25,h=8+Math.random()*40,d=10+Math.random()*25;
+    spawnOSMBuilding([{x:x-w/2,z:z-d/2},{x:x+w/2,z:z-d/2},{x:x+w/2,z:z+d/2},{x:x-w/2,z:z+d/2},{x:x-w/2,z:z-d/2}],h);
+  }
+  for(let i=0;i<8;i++) roadSegments.push({pts:[{x:(Math.random()-.5)*400,z:(Math.random()-.5)*400},{x:(Math.random()-.5)*400,z:(Math.random()-.5)*400}],type:'primary',isPrimary:true});
+  spawnCarsOnNewRoads();
+  document.getElementById('obj-type').textContent='DEMO MODE';
 }
 
-// ═══════════════════════════════════════════════
-//   GROUND PLANE
-// ═══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+//  GROUND
+// ══════════════════════════════════════════════════════
 function createGroundPlane(){
-    // Flat tiled ground for real-world mode
-    const size = 1400;
-    const geo = new THREE.PlaneGeometry(size, size, 40, 40);
-    geo.rotateX(-Math.PI/2);
-    const mat = new THREE.MeshBasicMaterial({color:0x001200,wireframe:true,transparent:true,opacity:0.12});
-    const fill= new THREE.MeshBasicMaterial({color:0x000800,transparent:true,opacity:0.35});
-    const m = new THREE.Mesh(geo, mat);
-    m.add(new THREE.Mesh(geo, fill));
-    scene.add(m);
-
-    // Grid cross pattern for streets feel
-    const gridMat = new THREE.LineBasicMaterial({color:0x003300,transparent:true,opacity:0.25});
-    for(let i=-10;i<=10;i++){
-        const s=i*60;
-        const hg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-700,0.05,s),new THREE.Vector3(700,0.05,s)]);
-        const vg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(s,0.05,-700),new THREE.Vector3(s,0.05,700)]);
-        scene.add(new THREE.Line(hg,gridMat)); scene.add(new THREE.Line(vg,gridMat));
-    }
+  const sz=1600,geo=new THREE.PlaneGeometry(sz,sz,44,44); geo.rotateX(-Math.PI/2);
+  const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x001200,wireframe:true,transparent:true,opacity:.1}));
+  m.add(new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x000800,transparent:true,opacity:.35}))); scene.add(m);
+  const gm=new THREE.LineBasicMaterial({color:0x002800,transparent:true,opacity:.2});
+  for(let i=-12;i<=12;i++){
+    const s=i*65;
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-800,.04,s),new THREE.Vector3(800,.04,s)]),gm));
+    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(s,.04,-800),new THREE.Vector3(s,.04,800)]),gm));
+  }
 }
 
-// ═══════════════════════════════════════════════
-//   DRONE MODEL
-// ═══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+//  DRONE — scale 0.55, camera brought closer
+// ══════════════════════════════════════════════════════
 function createDetailedDrone(){
-    droneGroup = new THREE.Group();
-    const mat = new THREE.MeshBasicMaterial({color:0x00ff44,wireframe:true});
-    const a1=new THREE.Mesh(new THREE.BoxGeometry(1.9,.06,.06),mat); a1.rotation.y=Math.PI/4;
-    const a2=new THREE.Mesh(new THREE.BoxGeometry(1.9,.06,.06),mat); a2.rotation.y=-Math.PI/4;
-    droneGroup.add(a1,a2,new THREE.Mesh(new THREE.BoxGeometry(.45,.3,.55),mat));
-    const cam=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,.12,8),mat); cam.rotation.x=Math.PI/2; cam.position.set(0,-.1,.3); droneGroup.add(cam);
-    payloadGroup=new THREE.Group();
-    const mine=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.65,8),mat); mine.rotation.x=Math.PI/2; payloadGroup.add(mine); payloadGroup.position.y=-.28; droneGroup.add(payloadGroup);
-    const pGeo=new THREE.BoxGeometry(.75,.01,.09);
-    [[.6,.1,.6],[-.6,.1,.6],[.6,.1,-.6],[-.6,.1,-.6]].forEach(p=>{ const m2=new THREE.Mesh(pGeo,mat); m2.position.set(...p); props.push(m2); droneGroup.add(m2); });
-    [[.6,.05,.6],[-.6,.05,.6],[.6,.05,-.6],[-.6,.05,-.6]].forEach(p=>{ const r=new THREE.Mesh(new THREE.TorusGeometry(.38,.02,6,18),mat); r.position.set(...p); r.rotation.x=Math.PI/2; droneGroup.add(r); });
-    scene.add(droneGroup);
+  droneGroup=new THREE.Group();
+  const mat=new THREE.MeshBasicMaterial({color:0x00ff44,wireframe:true});
+  const a1=new THREE.Mesh(new THREE.BoxGeometry(1.9,.06,.06),mat); a1.rotation.y=Math.PI/4;
+  const a2=new THREE.Mesh(new THREE.BoxGeometry(1.9,.06,.06),mat); a2.rotation.y=-Math.PI/4;
+  droneGroup.add(a1,a2,new THREE.Mesh(new THREE.BoxGeometry(.45,.3,.55),mat));
+  const cam=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,.12,8),mat); cam.rotation.x=Math.PI/2; cam.position.set(0,-.1,.3); droneGroup.add(cam);
+  payloadGroup=new THREE.Group();
+  const mine=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,.65,8),mat); mine.rotation.x=Math.PI/2; payloadGroup.add(mine); payloadGroup.position.y=-.28; droneGroup.add(payloadGroup);
+  const pGeo=new THREE.BoxGeometry(.75,.01,.09);
+  [[.6,.1,.6],[-.6,.1,.6],[.6,.1,-.6],[-.6,.1,-.6]].forEach(p=>{ const m2=new THREE.Mesh(pGeo,mat); m2.position.set(...p); props.push(m2); droneGroup.add(m2); });
+  [[.6,.05,.6],[-.6,.05,.6],[.6,.05,-.6],[-.6,.05,-.6]].forEach(p=>{ const r=new THREE.Mesh(new THREE.TorusGeometry(.38,.02,6,18),mat); r.position.set(...p); r.rotation.x=Math.PI/2; droneGroup.add(r); });
+  droneGroup.scale.setScalar(DRONE_SCALE);
+  scene.add(droneGroup);
 }
 
-// ─── TRAIL ───────────────────────────────────────────
+// ══════════════════════════════════════════════════════
+//  TRAIL
+// ══════════════════════════════════════════════════════
 function initTrail(){
-    const geo=new THREE.BufferGeometry();
-    geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(trailMax*3),3));
-    trailLine=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0x00ff44,transparent:true,opacity:0.28}));
-    scene.add(trailLine);
+  const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(trailMax*3),3));
+  trailLine=new THREE.Line(geo,new THREE.LineBasicMaterial({color:0x00ff44,transparent:true,opacity:.28})); scene.add(trailLine);
 }
 function updateTrail(){
-    trailPoints.push(droneState.pos.clone());
-    if(trailPoints.length>trailMax) trailPoints.shift();
-    const pos=trailLine.geometry.attributes.position.array;
-    trailPoints.forEach((p,i)=>{pos[i*3]=p.x;pos[i*3+1]=p.y;pos[i*3+2]=p.z;});
-    trailLine.geometry.attributes.position.needsUpdate=true;
-    trailLine.geometry.setDrawRange(0,trailPoints.length);
+  trailPoints.push(droneState.pos.clone()); if(trailPoints.length>trailMax) trailPoints.shift();
+  const pos=trailLine.geometry.attributes.position.array;
+  trailPoints.forEach((p,i)=>{pos[i*3]=p.x;pos[i*3+1]=p.y;pos[i*3+2]=p.z;});
+  trailLine.geometry.attributes.position.needsUpdate=true; trailLine.geometry.setDrawRange(0,trailPoints.length);
 }
 
-// ═══════════════════════════════════════════════
-//   MINIMAP
-// ═══════════════════════════════════════════════
-const mCanvas=document.getElementById('minimap-canvas'), mCtx=mCanvas.getContext('2d');
+// ══════════════════════════════════════════════════════
+//  MINIMAP
+// ══════════════════════════════════════════════════════
+const mCanvas=document.getElementById('minimap-canvas'),mCtx=mCanvas.getContext('2d');
 mCanvas.width=130; mCanvas.height=130;
 function updateMinimap(){
-    mCtx.clearRect(0,0,130,130);
-    const sc=.18, cx=65, cy=65;
-    mCtx.strokeStyle='rgba(57,255,20,0.07)'; mCtx.lineWidth=.5;
-    for(let i=0;i<130;i+=13){mCtx.beginPath();mCtx.moveTo(i,0);mCtx.lineTo(i,130);mCtx.stroke();mCtx.beginPath();mCtx.moveTo(0,i);mCtx.lineTo(130,i);mCtx.stroke();}
-    [20,42].forEach(r=>{mCtx.strokeStyle='rgba(57,255,20,0.1)';mCtx.beginPath();mCtx.arc(cx,cy,r,0,Math.PI*2);mCtx.stroke();});
-    // Buildings on minimap
-    staticBuildings.forEach(b=>{
-        const dx=(b.cx-droneState.pos.x)*sc, dz=(b.cz-droneState.pos.z)*sc;
-        if(Math.abs(dx)<62&&Math.abs(dz)<62){
-            mCtx.fillStyle='rgba(0,200,0,0.3)';
-            mCtx.fillRect(cx+dx-b.hw*sc, cy+dz-b.hd*sc, b.hw*sc*2, b.hd*sc*2);
-        }
-    });
-    document.getElementById('minimap-arrow').style.transform=`translate(-50%,-50%) rotate(${-droneState.rotY}rad)`;
+  mCtx.clearRect(0,0,130,130);
+  const sc=.15,cx=65,cy=65;
+  mCtx.strokeStyle='rgba(57,255,20,0.07)'; mCtx.lineWidth=.5;
+  for(let i=0;i<130;i+=13){mCtx.beginPath();mCtx.moveTo(i,0);mCtx.lineTo(i,130);mCtx.stroke();mCtx.beginPath();mCtx.moveTo(0,i);mCtx.lineTo(130,i);mCtx.stroke();}
+  [20,42].forEach(r=>{mCtx.strokeStyle='rgba(57,255,20,0.1)';mCtx.beginPath();mCtx.arc(cx,cy,r,0,Math.PI*2);mCtx.stroke();});
+  // Roads
+  roadSegments.forEach(seg=>{
+    if(seg.pts.length<2) return;
+    mCtx.beginPath(); mCtx.strokeStyle=seg.isPrimary?'rgba(0,200,60,.35)':'rgba(0,100,40,.2)'; mCtx.lineWidth=seg.isPrimary?1.2:.6;
+    seg.pts.forEach((p,i)=>{const dx=(p.x-droneState.pos.x)*sc,dz=(p.z-droneState.pos.z)*sc;i===0?mCtx.moveTo(cx+dx,cy+dz):mCtx.lineTo(cx+dx,cy+dz);});
+    mCtx.stroke();
+  });
+  // Buildings
+  staticBuildings.forEach(b=>{
+    const dx=(b.cx-droneState.pos.x)*sc,dz=(b.cz-droneState.pos.z)*sc;
+    if(Math.abs(dx)<62&&Math.abs(dz)<62){mCtx.fillStyle='rgba(0,200,0,.3)';mCtx.fillRect(cx+dx-b.hw*sc,cy+dz-b.hd*sc,b.hw*sc*2,b.hd*sc*2);}
+  });
+  // Cars
+  cars.forEach(c=>{
+    const dx=(c.mesh.position.x-droneState.pos.x)*sc,dz=(c.mesh.position.z-droneState.pos.z)*sc;
+    if(Math.abs(dx)<62&&Math.abs(dz)<62){mCtx.fillStyle='#ff9900';mCtx.shadowColor='#ff9900';mCtx.shadowBlur=3;mCtx.fillRect(cx+dx-1.5,cy+dz-1.5,3,3);mCtx.shadowBlur=0;}
+  });
+  // Entities
+  entities.forEach(en=>{
+    const dx=(en.mesh.position.x-droneState.pos.x)*sc,dz=(en.mesh.position.z-droneState.pos.z)*sc;
+    if(Math.abs(dx)<62&&Math.abs(dz)<62){
+      const col=en===currentMissionTarget?'#ffff00':en.type==='uav'?'#ff00ff':'#ff3030';
+      mCtx.fillStyle=col;mCtx.shadowColor=col;mCtx.shadowBlur=4;
+      const sz=en.type==='uav'?4:2.5;
+      mCtx.fillRect(cx+dx-sz/2,cy+dz-sz/2,sz,sz);mCtx.shadowBlur=0;
+    }
+  });
+  document.getElementById('minimap-arrow').style.transform=`translate(-50%,-50%) rotate(${-droneState.rotY}rad)`;
 }
 
-// ═══════════════════════════════════════════════
-//   AUDIO
-// ═══════════════════════════════════════════════
-let audioCtx, droneOsc, droneOsc2, droneGain;
+// ══════════════════════════════════════════════════════
+//  AUDIO
+// ══════════════════════════════════════════════════════
+let audioCtx,droneOsc,droneOsc2,droneGain;
 function initAudio(){
-    try{
-        audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-        droneOsc=audioCtx.createOscillator(); droneOsc2=audioCtx.createOscillator();
-        droneOsc.type=droneOsc2.type='sawtooth'; droneOsc2.detune.value=9;
-        droneGain=audioCtx.createGain(); droneGain.gain.value=0.038;
-        const lpf=audioCtx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=1100; lpf.Q.value=0.9;
-        const hpf=audioCtx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=50;
-        const comp=audioCtx.createDynamicsCompressor(); comp.threshold.value=-20; comp.ratio.value=4;
-        droneOsc.connect(lpf); droneOsc2.connect(lpf); lpf.connect(hpf); hpf.connect(comp); comp.connect(droneGain); droneGain.connect(audioCtx.destination);
-        droneOsc.start(); droneOsc2.start();
-    }catch(e){}
+  try{
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    droneOsc=audioCtx.createOscillator(); droneOsc2=audioCtx.createOscillator();
+    droneOsc.type=droneOsc2.type='sawtooth'; droneOsc2.detune.value=9;
+    droneGain=audioCtx.createGain(); droneGain.gain.value=.038;
+    const lpf=audioCtx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=1100; lpf.Q.value=.9;
+    const hpf=audioCtx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=50;
+    const comp=audioCtx.createDynamicsCompressor(); comp.threshold.value=-20; comp.ratio.value=4;
+    droneOsc.connect(lpf); droneOsc2.connect(lpf); lpf.connect(hpf); hpf.connect(comp); comp.connect(droneGain); droneGain.connect(audioCtx.destination);
+    droneOsc.start(); droneOsc2.start();
+  }catch(e){}
 }
-function playExplosion(){
-    if(!audioCtx) return;
-    const t=audioCtx.currentTime;
-    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-    o.type='sine'; o.frequency.setValueAtTime(65,t); o.frequency.exponentialRampToValueAtTime(18,t+.4);
-    g.gain.setValueAtTime(.8,t); g.gain.exponentialRampToValueAtTime(.001,t+.42);
-    o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t+.44);
+function playGunshot(vol=.06){
+  if(!audioCtx) return;
+  const t=audioCtx.currentTime;
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.type='square'; o.frequency.setValueAtTime(240+Math.random()*100,t); o.frequency.exponentialRampToValueAtTime(35,t+.1);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+.13); o.connect(g); g.connect(audioCtx.destination); o.start(t); o.stop(t+.14);
+  const frames=Math.floor(audioCtx.sampleRate*.09),buf=audioCtx.createBuffer(1,frames,audioCtx.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<frames;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/frames,1.8);
+  const src=audioCtx.createBufferSource(),gn=audioCtx.createGain(),bpf=audioCtx.createBiquadFilter();
+  bpf.type='bandpass'; bpf.frequency.value=900; bpf.Q.value=.6;
+  gn.gain.setValueAtTime(vol*.6,t); gn.gain.exponentialRampToValueAtTime(.001,t+.1);
+  src.buffer=buf; src.connect(bpf); bpf.connect(gn); gn.connect(audioCtx.destination); src.start(t); src.stop(t+.1);
 }
-
-// ═══════════════════════════════════════════════
-//   CRASH EFFECT
-// ═══════════════════════════════════════════════
-function createCrashExplosion(pos){
-    playExplosion();
-    const R=10;
-    const flash=new THREE.Mesh(new THREE.SphereGeometry(R,8,8),new THREE.MeshBasicMaterial({color:0xffffcc,transparent:true,opacity:.9}));
-    flash.position.copy(pos); scene.add(flash);
-    particles.push({mesh:flash,vel:new THREE.Vector3(),life:.15,isFlash:true});
-    for(let i=0;i<40;i++){
-        const p=new THREE.Mesh(new THREE.BoxGeometry(.4,.4,.4),new THREE.MeshBasicMaterial({color:[0xff5500,0xff2200,0xffaa00][i%3],transparent:true}));
-        p.position.copy(pos);
-        const vel=new THREE.Vector3((Math.random()-.5),(Math.random()*.85),(Math.random()-.5)).normalize().multiplyScalar(8+Math.random()*25);
-        particles.push({mesh:p,vel,life:.8+Math.random()*1.2}); scene.add(p);
-    }
-}
-
-// ═══════════════════════════════════════════════
-//   GAME OVER
-// ═══════════════════════════════════════════════
-function endGame(msg='Врезался в здание'){
-    if(isGameOver) return; isGameOver=true;
-    createCrashExplosion(droneState.pos.clone());
-    document.getElementById('static-noise').style.display='block';
-    document.getElementById('chromatic').classList.add('active');
-    setTimeout(()=>{
-        document.getElementById('restart-screen').style.display='flex';
-        document.getElementById('res-sub').textContent=msg;
-    },1200);
+function playExplosion(big=false){
+  if(!audioCtx) return;
+  const t=audioCtx.currentTime,vol=big?.7:.45;
+  const o=audioCtx.createOscillator(),gt=audioCtx.createGain(); o.type='sine';
+  o.frequency.setValueAtTime(65,t); o.frequency.exponentialRampToValueAtTime(18,t+.4);
+  gt.gain.setValueAtTime(vol,t); gt.gain.exponentialRampToValueAtTime(.001,t+.42); o.connect(gt); gt.connect(audioCtx.destination); o.start(t); o.stop(t+.44);
+  const dur=big?2.5:1.2,frames=Math.floor(audioCtx.sampleRate*dur),buf=audioCtx.createBuffer(1,frames,audioCtx.sampleRate),dd=buf.getChannelData(0);
+  for(let i=0;i<frames;i++) dd[i]=(Math.random()*2-1)*Math.pow(1-i/frames,big?1.2:1.8);
+  const src=audioCtx.createBufferSource(),lpf=audioCtx.createBiquadFilter(),gn=audioCtx.createGain();
+  lpf.type='lowpass'; lpf.frequency.value=big?700:450;
+  gn.gain.setValueAtTime(vol*.8,t); gn.gain.exponentialRampToValueAtTime(.001,t+dur);
+  src.buffer=buf; src.connect(lpf); lpf.connect(gn); gn.connect(audioCtx.destination); src.start(t); src.stop(t+dur);
 }
 
-// ═══════════════════════════════════════════════
-//   POINT IN POLYGON (2D)
-// ═══════════════════════════════════════════════
-function pointInPolygon2D(px, pz, pts){
-    let inside=false;
-    for(let i=0,j=pts.length-1;i<pts.length;j=i++){
-        const xi=pts[i].x,zi=pts[i].z,xj=pts[j].x,zj=pts[j].z;
-        if(((zi>pz)!==(zj>pz))&&(px<(xj-xi)*(pz-zi)/(zj-zi)+xi)) inside=!inside;
-    }
-    return inside;
+// ══════════════════════════════════════════════════════
+//  PARTICLES / EXPLOSION
+// ══════════════════════════════════════════════════════
+function createExplosion(pos,color=0xff5500,count=40,big=false){
+  playExplosion(big);
+  [[big?22:9,0xffffcc,.95,.12],[big?37:15,0xff8800,.6,.22]].forEach(([r,col,op,life])=>{
+    const m=new THREE.Mesh(new THREE.SphereGeometry(r,8,8),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:op}));
+    m.position.copy(pos); scene.add(m); particles.push({mesh:m,vel:new THREE.Vector3(),life,isFlash:true});
+  });
+  if(big){
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1,.6,4,24),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.75}));
+    ring.position.copy(pos); ring.rotation.x=Math.PI/2; scene.add(ring); particles.push({mesh:ring,vel:new THREE.Vector3(),life:.65,isRing:true});
+  }
+  const shapes=[new THREE.BoxGeometry(.4,.4,.4),new THREE.TetrahedronGeometry(.5)];
+  for(let i=0;i<count;i++){
+    const p=new THREE.Mesh(shapes[i%2].clone(),new THREE.MeshBasicMaterial({color:[color,0xff2200,0xffaa00,0xff6600,0xffffff][i%5],transparent:true}));
+    p.position.copy(pos);
+    const vel=new THREE.Vector3((Math.random()-.5),(Math.random()*.85),(Math.random()-.5)).normalize().multiplyScalar((big?14:7)+Math.random()*(big?35:20));
+    particles.push({mesh:p,vel,life:.6+Math.random()*(big?2:1)}); scene.add(p);
+  }
+  for(let i=0;i<(big?16:6);i++){
+    const p=new THREE.Mesh(new THREE.SphereGeometry(.7+Math.random()*(big?3:1.5),6,6),new THREE.MeshBasicMaterial({color:big?0x333333:0x1a1a1a,transparent:true,opacity:.45}));
+    p.position.copy(pos).add(new THREE.Vector3((Math.random()-.5)*5,(Math.random()-.5)*5,(Math.random()-.5)*5));
+    const vel=new THREE.Vector3((Math.random()-.5)*4,4+Math.random()*(big?12:5),(Math.random()-.5)*4);
+    particles.push({mesh:p,vel,life:(big?4:2)+Math.random()*1.5,isSmoke:true}); scene.add(p);
+  }
 }
 
-// ═══════════════════════════════════════════════
-//   JOYSTICK SETUP
-// ═══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+//  GAME OVER
+// ══════════════════════════════════════════════════════
+function endGame(msg='Врезался в здание',success=false){
+  if(isGameOver) return; isGameOver=true;
+  createExplosion(droneState.pos.clone(),success?0xffff00:0xff2200,success?70:50,true);
+  document.getElementById('static-noise').style.display='block';
+  document.getElementById('chromatic').classList.add('active');
+  setTimeout(()=>{
+    document.getElementById('restart-screen').style.display='flex';
+    const box=document.getElementById('screen-box');
+    if(success){box.className='screen-content success';document.getElementById('res-msg').textContent='ВЬЕБАЛ!';document.getElementById('res-sub').textContent='ЦЕЛЬ УНИЧТОЖЕНА!';}
+    else{document.getElementById('res-msg').textContent='КРЭШ!';document.getElementById('res-sub').textContent=msg;}
+  },1300);
+}
+
+// ══════════════════════════════════════════════════════
+//  POLYGON HIT TEST
+// ══════════════════════════════════════════════════════
+function pip2D(px,pz,pts){
+  let inside=false;
+  for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+    const xi=pts[i].x,zi=pts[i].z,xj=pts[j].x,zj=pts[j].z;
+    if(((zi>pz)!==(zj>pz))&&(px<(xj-xi)*(pz-zi)/(zj-zi)+xi)) inside=!inside;
+  }
+  return inside;
+}
+
+// ══════════════════════════════════════════════════════
+//  JOYSTICKS
+// ══════════════════════════════════════════════════════
 let input={left:{x:0,y:0},right:{x:0,y:0}};
 function setupJoysticks(){
-    nipplejs.create({zone:document.getElementById('joystick-left'),mode:'static',position:{left:'50%',top:'50%'},color:'#39ff14'})
-        .on('move',(e,d)=>input.left=d.vector).on('end',()=>input.left={x:0,y:0});
-    nipplejs.create({zone:document.getElementById('joystick-right'),mode:'static',position:{left:'50%',top:'50%'},color:'white'})
-        .on('move',(e,d)=>input.right=d.vector).on('end',()=>input.right={x:0,y:0});
+  nipplejs.create({zone:document.getElementById('joystick-left'),mode:'static',position:{left:'50%',top:'50%'},color:'#39ff14'}).on('move',(e,d)=>input.left=d.vector).on('end',()=>input.left={x:0,y:0});
+  nipplejs.create({zone:document.getElementById('joystick-right'),mode:'static',position:{left:'50%',top:'50%'},color:'white'}).on('move',(e,d)=>input.right=d.vector).on('end',()=>input.right={x:0,y:0});
 }
 
-// ═══════════════════════════════════════════════
-//   CLOSEST BUILDING FOR TARGET UI
-// ═══════════════════════════════════════════════
-function updateTargetUI(){
-    let best=null, minDist=300;
-    const ui=document.getElementById('target-ui');
-    staticBuildings.forEach(b=>{
-        const dx=b.cx-droneState.pos.x, dz=b.cz-droneState.pos.z;
-        const dist=Math.sqrt(dx*dx+dz*dz);
-        if(dist<minDist){
-            const wp=new THREE.Vector3(b.cx, b.height/2, b.cz).project(camera);
-            if(Math.abs(wp.z)<1&&Math.abs(wp.x)<.85&&Math.abs(wp.y)<.85){ minDist=dist; best={x:(wp.x*.5+.5)*innerWidth,y:(wp.y*-.5+.5)*innerHeight,dist}; }
-        }
-    });
-    if(best){ ui.style.display='block'; ui.style.left=best.x+'px'; ui.style.top=best.y+'px'; document.getElementById('target-dist').textContent=`${best.dist.toFixed(0)}m`; }
-    else ui.style.display='none';
-}
-
-// ═══════════════════════════════════════════════
-//   MAIN LOOP
-// ═══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════
+//  MAIN LOOP
+// ══════════════════════════════════════════════════════
 function animate(){
-    if(isGameOver){ renderer.render(scene,camera); return; }
-    requestAnimationFrame(animate);
-    const dt=Math.min(clock.getDelta(),.05);
+  if(isGameOver){renderer.render(scene,camera);return;}
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),.05), time=clock.getElapsedTime();
 
-    updateMinimap(); updateTrail(); updateTargetUI();
+  updateMinimap(); updateTrail(); updateSeeker(); updateMission();
+  updateCars(dt); updateEntities(dt,time);
+  checkAndLoadNewZone();
 
-    // Audio pitch
-    if(droneOsc){ const f=65+droneState.vel.length()*3.5; droneOsc.frequency.setTargetAtTime(f,audioCtx.currentTime,.08); droneOsc2.frequency.setTargetAtTime(f+9,audioCtx.currentTime,.08); }
+  // Audio
+  if(droneOsc){const f=65+droneState.vel.length()*3.5;droneOsc.frequency.setTargetAtTime(f,audioCtx.currentTime,.08);droneOsc2.frequency.setTargetAtTime(f+9,audioCtx.currentTime,.08);}
 
-    // Props
-    props.forEach((p,i)=>p.rotation.y+=(40+(input.left.y+1)*40)*dt*(i%2===0?1:-1));
+  // Props
+  props.forEach((p,i)=>p.rotation.y+=(40+(input.left.y+1)*40)*dt*(i%2===0?1:-1));
 
-    // Physics
-    droneState.rotY-=input.left.x*PHYSICS.rotationSpeed*dt;
-    droneState.tiltX=THREE.MathUtils.lerp(droneState.tiltX,-input.right.y*PHYSICS.tiltMax,.1);
-    droneState.tiltZ=THREE.MathUtils.lerp(droneState.tiltZ,-input.right.x*PHYSICS.tiltMax,.1);
-    const mDir=new THREE.Vector3(input.right.x,0,-input.right.y).applyAxisAngle(new THREE.Vector3(0,1,0),droneState.rotY);
-    droneState.vel.addScaledVector(mDir,PHYSICS.acceleration*dt);
-    droneState.vel.y+=(input.left.y*PHYSICS.lift-9.81)*dt;
-    droneState.vel.multiplyScalar(PHYSICS.friction);
-    droneState.pos.addScaledVector(droneState.vel,dt);
+  // Physics
+  droneState.rotY-=input.left.x*PHYSICS.rotationSpeed*dt;
+  droneState.tiltX=THREE.MathUtils.lerp(droneState.tiltX,-input.right.y*PHYSICS.tiltMax,.1);
+  droneState.tiltZ=THREE.MathUtils.lerp(droneState.tiltZ,-input.right.x*PHYSICS.tiltMax,.1);
+  const mDir=new THREE.Vector3(input.right.x,0,-input.right.y).applyAxisAngle(new THREE.Vector3(0,1,0),droneState.rotY);
+  droneState.vel.addScaledVector(mDir,PHYSICS.acceleration*dt);
+  droneState.vel.y+=(input.left.y*PHYSICS.lift-9.81)*dt;
+  droneState.vel.multiplyScalar(PHYSICS.friction);
+  droneState.pos.addScaledVector(droneState.vel,dt);
+  if(droneState.pos.y<0.4){droneState.pos.y=0.4;droneState.vel.y=0;endGame('Упал на землю');}
 
-    // Clamp altitude min
-    if(droneState.pos.y < 0.5){ droneState.pos.y=0.5; droneState.vel.y=0; endGame('Упал на землю'); }
+  droneGroup.position.copy(droneState.pos);
+  droneGroup.rotation.set(0,0,0); droneGroup.rotateY(droneState.rotY); droneGroup.rotateX(droneState.tiltX); droneGroup.rotateZ(droneState.tiltZ);
 
-    droneGroup.position.copy(droneState.pos);
-    droneGroup.rotation.set(0,0,0); droneGroup.rotateY(droneState.rotY); droneGroup.rotateX(droneState.tiltX); droneGroup.rotateZ(droneState.tiltZ);
+  // Camera closer to drone (was 7, now 4.5)
+  const camOff=new THREE.Vector3(0,2,4.5).applyAxisAngle(new THREE.Vector3(0,1,0),droneState.rotY);
+  camera.position.lerp(droneState.pos.clone().add(camOff),.18);
+  camera.lookAt(droneState.pos);
 
-    camera.position.lerp(droneState.pos.clone().add(new THREE.Vector3(0,3,7).applyAxisAngle(new THREE.Vector3(0,1,0),droneState.rotY)),.15);
-    camera.lookAt(droneState.pos);
+  // Tracers
+  for(let i=tracers.length-1;i>=0;i--){
+    const t=tracers[i]; t.mesh.position.addScaledVector(t.dir,TRACER_SPEED*dt);
+    t.life-=dt; t.mesh.material.opacity=Math.max(0,t.life*.8);
+    if(t.life<=0){scene.remove(t.mesh);tracers.splice(i,1);}
+  }
 
-    // Particles
-    for(let i=particles.length-1;i>=0;i--){
-        const p=particles[i]; p.mesh.position.addScaledVector(p.vel,dt);
-        if(p.isFlash){ p.mesh.scale.setScalar(p.mesh.scale.x+dt*20); p.mesh.material.opacity=Math.max(0,p.life*8); }
-        else { p.vel.y-=9.81*dt; p.mesh.material.opacity=Math.max(0,p.life*.8); p.mesh.rotation.x+=dt*2.2; p.mesh.rotation.y+=dt*3.1; }
-        p.life-=dt; if(p.life<=0){ scene.remove(p.mesh); particles.splice(i,1); }
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i]; p.mesh.position.addScaledVector(p.vel,dt);
+    if(p.isRing){p.mesh.scale.addScalar(dt*30);p.mesh.material.opacity=Math.max(0,p.life*1.4);}
+    else if(p.isSmoke){p.vel.multiplyScalar(.975);p.mesh.scale.addScalar(dt*2);p.mesh.material.opacity=Math.max(0,p.life*.3);}
+    else if(p.isFlash){p.mesh.scale.setScalar(p.mesh.scale.x+dt*22);p.mesh.material.opacity=Math.max(0,p.life*8);}
+    else{p.vel.y-=9.81*dt;p.mesh.material.opacity=Math.max(0,p.life*.8);p.mesh.rotation.x+=dt*2.2;p.mesh.rotation.y+=dt*3.1;}
+    p.life-=dt; if(p.life<=0){scene.remove(p.mesh);particles.splice(i,1);}
+  }
+
+  // Collision: ground
+  if(droneState.pos.y<0.4) endGame('Упал на землю');
+  // Collision: buildings (polygon)
+  const px=droneState.pos.x,py=droneState.pos.y,pz=droneState.pos.z;
+  for(const b of staticBuildings){
+    if(Math.abs(px-b.cx)>b.hw+1.5||Math.abs(pz-b.cz)>b.hd+1.5) continue;
+    if(py<0||py>b.height+.5) continue;
+    if(b.pts&&pip2D(px,pz,b.pts)){endGame('Врезался в здание');break;}
+    else if(!b.pts&&Math.abs(px-b.cx)<b.hw&&Math.abs(pz-b.cz)<b.hd&&py<b.height){endGame('Врезался в здание');break;}
+  }
+  // Collision: combat entities
+  for(const en of entities){
+    if(droneState.pos.distanceTo(en.mesh.position)<(en.radius*.7+.8)){
+      endGame(en.side==='hostile'?'Сбит противником':'Столкновение',en.side==='hostile'); break;
     }
+  }
 
-    // ── BUILDING COLLISION (precise polygon) ──
-    const px=droneState.pos.x, py=droneState.pos.y, pz=droneState.pos.z;
-    for(const b of staticBuildings){
-        // Quick AABB first
-        if(Math.abs(px-b.cx)>b.hw+2||Math.abs(pz-b.cz)>b.hd+2) continue;
-        if(py<0||py>b.height+0.5) continue;
-        // Precise polygon check
-        if(b.pts && pointInPolygon2D(px,pz,b.pts)){ endGame('Врезался в здание'); break; }
-        // Fallback AABB if no pts
-        else if(!b.pts && Math.abs(px-b.cx)<b.hw && Math.abs(pz-b.cz)<b.hd && py<b.height){ endGame('Врезался в здание'); break; }
-    }
+  // HUD
+  const speed=droneState.vel.length()*3.6, altM=droneState.pos.y;
+  document.getElementById('alt-big').textContent=altM.toFixed(0);
+  document.getElementById('spd-big').textContent=speed.toFixed(0);
+  document.getElementById('alt-t1').textContent=Math.max(0,altM-20).toFixed(0);
+  document.getElementById('alt-t2').textContent=(altM+20).toFixed(0);
+  document.getElementById('spd-t1').textContent=Math.max(0,speed-20).toFixed(0);
+  document.getElementById('spd-t2').textContent=(speed+20).toFixed(0);
+  const hdg=((droneState.rotY*180/Math.PI)%360+360)%360;
+  document.getElementById('heading-deg').textContent=hdg.toFixed(0).padStart(3,'0')+'°';
+  const ch=document.getElementById('chromatic'); if(speed>80)ch.classList.add('active');else ch.classList.remove('active');
 
-    // HUD
-    const speed=droneState.vel.length()*3.6;
-    const altM=droneState.pos.y;
-    document.getElementById('alt-big').textContent=altM.toFixed(0);
-    document.getElementById('spd-big').textContent=speed.toFixed(0);
-    document.getElementById('alt-t1').textContent=Math.max(0,altM-20).toFixed(0);
-    document.getElementById('alt-t2').textContent=(altM+20).toFixed(0);
-    document.getElementById('spd-t1').textContent=Math.max(0,speed-20).toFixed(0);
-    document.getElementById('spd-t2').textContent=(speed+20).toFixed(0);
-    const hdg=((droneState.rotY*180/Math.PI)%360+360)%360;
-    document.getElementById('heading-deg').textContent=hdg.toFixed(0).padStart(3,'0')+'°';
-    document.getElementById('pill-alt').textContent=`ALT: ${altM.toFixed(0)}m`;
+  // Threat pill
+  const hostile=entities.filter(e=>e.side==='hostile');
+  const nearest=hostile.reduce((c,e)=>{const d=droneState.pos.distanceTo(e.mesh.position);return(!c||d<c.d)?{d,e}:c;},null);
+  const pt=document.getElementById('pill-threat');
+  if(nearest&&nearest.d<120){pt.className='status-pill warn';pt.textContent='⚡ THREAT: CRIT';}
+  else{pt.className='status-pill hot';pt.textContent='THREAT: HIGH';}
+  const uavCount=entities.filter(e=>e.type==='uav').length;
+  const pu=document.getElementById('pill-uav'); pu.textContent=`UAV: ${uavCount}`; pu.className=uavCount>0?'status-pill purple':'status-pill';
 
-    // Chromatic on speed
-    const ch=document.getElementById('chromatic');
-    if(speed>80) ch.classList.add('active'); else ch.classList.remove('active');
-
-    renderer.render(scene,camera);
+  renderer.render(scene,camera);
 }
 
-window.addEventListener('resize',()=>{
-    camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight);
-});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
 </script>
 
 </body>
