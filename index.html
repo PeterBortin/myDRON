@@ -2,219 +2,631 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>myDRON Tactical HUD v3.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>FPV Tactical HUD | Drone Sensor Link</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
-        
-        #loader {
-            position: fixed; inset: 0; background: #000; z-index: 1000;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; color: #0f0;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
-        .logo-anim { font-size: 42px; font-weight: bold; letter-spacing: 12px; margin-bottom: 30px; text-shadow: 0 0 10px #0f0; animation: blink 0.1s infinite alternate; }
-        .bar { width: 250px; height: 2px; background: #010; border: 1px solid #0f0; overflow: hidden; }
-        .fill { width: 0%; height: 100%; background: #0f0; box-shadow: 0 0 10px #0f0; }
-        @keyframes blink { 0% { opacity: 0.8; } 100% { opacity: 1; } }
 
-        #cam { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; opacity: 0.5; filter: grayscale(1) brightness(0.6) contrast(1.4); display: none; }
-        canvas { position: relative; z-index: 5; display: block; filter: brightness(1.2) drop-shadow(0 0 2px #0f0); }
-        .crt { position: fixed; inset: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%), linear-gradient(90deg, rgba(255,0,0,0.05), rgba(0,255,0,0.02), rgba(0,0,255,0.05)); background-size: 100% 3px, 3px 100%; pointer-events: none; z-index: 10; }
+        body, html {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+            font-family: 'Courier New', 'Courier', 'Fira Code', monospace;
+        }
 
-        .launch-btn {
-            position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
-            background: rgba(0, 40, 0, 0.8); color: #0f0; border: 1px solid #0f0;
-            padding: 15px 50px; font-size: 20px; font-weight: bold; cursor: pointer; z-index: 20;
-            text-transform: uppercase; letter-spacing: 8px; backdrop-filter: blur(5px);
+        /* Камера (полноэкранное видео с эффектами) */
+        #camVideo {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            filter: grayscale(0.85) brightness(0.55) contrast(1.5) sepia(0.2) hue-rotate(85deg);
+            transform: scale(1.01);
+            display: none;
+        }
+
+        /* Эффект «старой электроники» + CRT + дисторсия */
+        .crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 20, 0, 0.2) 0px,
+                rgba(0, 20, 0, 0.2) 2px,
+                transparent 2px,
+                transparent 4px
+            ), 
+            linear-gradient(90deg, 
+                rgba(0, 255, 0, 0.03) 0%, 
+                rgba(0, 0, 0, 0.1) 50%,
+                rgba(0, 255, 0, 0.03) 100%);
+            pointer-events: none;
+            z-index: 10;
+            mix-blend-mode: overlay;
+        }
+
+        /* Canvas HUD поверх видео */
+        #hudCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* Панель управления – тактильная, прозрачная, с неоном */
+        .controls {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            display: flex;
+            gap: 14px;
+            background: rgba(0, 8, 0, 0.65);
+            backdrop-filter: blur(8px);
+            padding: 10px 20px;
+            border-radius: 40px;
+            border: 1px solid rgba(0, 255, 0, 0.5);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+            pointer-events: auto;
+        }
+
+        button {
+            background: rgba(0, 20, 0, 0.9);
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 8px 18px;
+            text-transform: uppercase;
+            font-size: 12px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
+            cursor: pointer;
+            border-radius: 30px;
+            transition: 0.2s;
+            box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+        }
+
+        button:active {
+            background: #0f0;
+            color: #000;
+            box-shadow: 0 0 18px #0f0;
+            transform: scale(0.96);
+        }
+
+        /* Индикатор записи / состояния микрофона */
+        .mic-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 25;
+            background: rgba(0,0,0,0.6);
+            border-left: 3px solid #0f0;
+            padding: 5px 12px;
+            font-size: 10px;
+            font-family: monospace;
+            color: #0f0;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+            border-radius: 8px;
+        }
+
+        @media (max-width: 700px) {
+            button { padding: 6px 12px; font-size: 10px; }
+            .controls { gap: 8px; padding: 8px 16px; bottom: 16px; }
         }
     </style>
 </head>
 <body>
 
-<div id="loader">
-    <div class="logo-anim">myDRON</div>
-    <div id="status" style="font-size: 12px; margin-bottom: 10px;">LOADING MODULES...</div>
-    <div class="bar"><div id="fill" class="fill"></div></div>
-</div>
-
-<video id="cam" autoplay playsinline></video>
-<div class="crt"></div>
+<video id="camVideo" autoplay playsinline muted></video>
+<div class="crt-overlay"></div>
 <canvas id="hudCanvas"></canvas>
-<button class="launch-btn" id="lBtn" onclick="startSystem()">Запуск</button>
+<div class="controls">
+    <button id="sensorBtn">⚡ LINK SENSORS</button>
+    <button id="alertBtn">⚠️ ALERT</button>
+    <button id="resetBtn">⟳ RESET</button>
+</div>
+<div class="mic-indicator" id="micStatus">🎙️ MIC: IDLE</div>
 
 <script>
-    const canvas = document.getElementById('hudCanvas');
-    const ctx = canvas.getContext('2d');
-    const video = document.getElementById('cam');
-    
-    let w, h, frame = 0;
-    let pitch = 0, roll = 0, yaw = 0;
-    let isActive = false;
-    let targets = [];
+    (function(){
+        // ---------- DOM elements ----------
+        const canvas = document.getElementById('hudCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('camVideo');
+        const sensorBtn = document.getElementById('sensorBtn');
+        const alertBtn = document.getElementById('alertBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const micStatusDiv = document.getElementById('micStatus');
 
-    // 1. Экран загрузки
-    let prg = 0;
-    const loadInt = setInterval(() => {
-        prg += Math.random() * 4;
-        document.getElementById('fill').style.width = Math.min(prg, 100) + '%';
-        if(prg >= 100) {
-            clearInterval(loadInt);
-            setTimeout(() => document.getElementById('loader').style.display = 'none', 600);
+        // ---------- Состояние системы ----------
+        let width, height;
+        let frame = 0;
+        let pitch = 0;          // тангаж (наклон вперед/назад)
+        let roll = 0;           // крен (наклон влево/вправо)
+        let yaw = 0;            // рыскание (компасное направление, имитация)
+        let speed = 126.4;      // скорость (узлы/кмч)
+        let altitude = 7820;     // высота в метрах/футах
+        let batteryVoltage = 24.8;
+        let rssi = 87;           // уровень сигнала
+        
+        let alertMode = false;
+        let sensorsLinked = false;
+        let cameraActive = false;
+        let micActive = false;
+        
+        let audioContext = null;
+        let micStream = null;
+        let audioAnalyser = null;
+        let audioDataArray = null;
+        let micLevel = 0;
+        
+        // Для гироскопа – флаги и калибровка
+        let deviceOrientationSupported = false;
+        let calibrateOffset = { beta: 0, gamma: 0 };
+        let isCalibrated = false;
+        
+        // ---------- Вспомогательные функции ----------
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
         }
-    }, 80);
-
-    function resize() {
-        w = canvas.width = window.innerWidth;
-        h = canvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resize);
-    resize();
-
-    // 2. Инициализация сенсоров и прицела
-    async function startSystem() {
-        isActive = true;
-        document.getElementById('lBtn').style.display = 'none';
+        window.addEventListener('resize', () => { resizeCanvas(); });
+        resizeCanvas();
         
-        try {
-            const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            video.srcObject = s; video.style.display = 'block';
-        } catch(e) { console.warn("No Camera"); }
-
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            const res = await DeviceOrientationEvent.requestPermission();
-            if (res === 'granted') window.addEventListener('deviceorientation', updateSensors);
-        } else { window.addEventListener('deviceorientation', updateSensors); }
-
-        // Инициализация фиктивных целей для автозахвата
-        targets = Array.from({length: 3}, () => ({
-            x: Math.random() * w, y: Math.random() * h,
-            vx: Math.random() * 2 - 1, vy: Math.random() * 2 - 1, id: Math.floor(Math.random()*999)
-        }));
-    }
-
-    function updateSensors(e) {
-        yaw = e.alpha || 0;    // Ось X
-        pitch = e.beta || 0;   // Ось Y
-        roll = e.gamma || 0;
-    }
-
-    // Отрисовка барабанов (X и Y)
-    function drawTape(x, y, val, label, isRight = false) {
-        const th = 260, tw = 65;
-        ctx.strokeStyle = '#0f0';
-        ctx.strokeRect(x, y - th/2, tw, th);
-        ctx.save();
-        ctx.rect(x, y - th/2, tw, th);
-        ctx.clip();
-        
-        for(let i = -10; i <= 10; i++) {
-            let v = Math.round(val + i * 10);
-            let ty = y - (i * 40) + (val % 10) * 4;
-            ctx.beginPath();
-            ctx.moveTo(isRight ? x : x + tw, ty);
-            ctx.lineTo(isRight ? x + 15 : x + tw - 15, ty);
-            ctx.stroke();
-            ctx.font = '11px monospace';
-            ctx.fillStyle = '#0f0';
-            ctx.fillText(v, isRight ? x + 20 : x + 5, ty + 4);
-        }
-        ctx.restore();
-        ctx.fillText(label, x, y - th/2 - 10);
-    }
-
-    // Авиагоризонт
-    function drawHorizon() {
-        ctx.save();
-        ctx.translate(w/2, h/2);
-        ctx.rotate(roll * Math.PI / 180);
-        ctx.translate(0, (pitch - 45) * 5); // Смещение для удобства
-        
-        ctx.strokeStyle = 'rgba(0, 255, 0, 0.6)';
-        ctx.lineWidth = 2;
-        for(let i = -6; i <= 6; i++) {
-            if(i===0) {
-                ctx.beginPath(); ctx.moveTo(-150, 0); ctx.lineTo(-40, 0); ctx.moveTo(40, 0); ctx.lineTo(150, 0); ctx.stroke();
-            } else {
-                let ty = i * 50;
-                ctx.beginPath(); ctx.moveTo(-30, ty); ctx.lineTo(30, ty); ctx.stroke();
-                ctx.fillText(i * 10, 40, ty + 4);
+        // ---------- 1. КАМЕРА (FPV) ----------
+        async function initCamera() {
+            try {
+                // Используем rear camera если доступна (environment)
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: { exact: "environment" } 
+                    },
+                    audio: false 
+                });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                cameraActive = true;
+                console.log("[HUD] Camera FPV stream active");
+            } catch (err) {
+                console.warn("[HUD] Rear camera failed, trying default camera", err);
+                try {
+                    const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    video.srcObject = fallbackStream;
+                    video.style.display = 'block';
+                    cameraActive = true;
+                } catch (e) {
+                    console.error("[HUD] Camera denied or error");
+                    cameraActive = false;
+                }
             }
         }
-        ctx.restore();
-    }
-
-    // Система автозахвата
-    function drawTargeting() {
-        if(!isActive) return;
-        targets.forEach(t => {
-            t.x += t.vx; t.y += t.vy;
-            if(t.x < 0 || t.x > w) t.vx *= -1;
-            if(t.y < 0 || t.y > h) t.vy *= -1;
-
-            const size = 50 + Math.sin(frame*0.1)*5;
-            ctx.strokeStyle = '#f00';
-            ctx.lineWidth = 1.5;
-            
-            // Углы рамки
-            ctx.beginPath();
-            ctx.moveTo(t.x - size/2, t.y - size/2 + 10); ctx.lineTo(t.x - size/2, t.y - size/2); ctx.lineTo(t.x - size/2 + 10, t.y - size/2);
-            ctx.moveTo(t.x + size/2, t.y - size/2 + 10); ctx.lineTo(t.x + size/2, t.y - size/2); ctx.lineTo(t.x + size/2 - 10, t.y - size/2);
-            ctx.moveTo(t.x - size/2, t.y + size/2 - 10); ctx.lineTo(t.x - size/2, t.y + size/2); ctx.lineTo(t.x - size/2 + 10, t.y + size/2);
-            ctx.moveTo(t.x + size/2, t.y + size/2 - 10); ctx.lineTo(t.x + size/2, t.y + size/2); ctx.lineTo(t.x + size/2 - 10, t.y + size/2);
-            ctx.stroke();
-
-            // Линия захвата
-            ctx.setLineDash([5, 5]);
-            ctx.beginPath(); ctx.moveTo(w/2, h/2); ctx.lineTo(t.x, t.y); ctx.stroke();
-            ctx.setLineDash([]);
-            
-            ctx.fillStyle = '#f00';
-            ctx.font = '10px monospace';
-            ctx.fillText(`LOCK: OBJT_${t.id}`, t.x + size/2 + 5, t.y - 10);
-            ctx.fillText(`AZ: ${t.x.toFixed(0)}`, t.x + size/2 + 5, t.y + 5);
-        });
-    }
-
-    function loop() {
-        frame++;
-        ctx.clearRect(0, 0, w, h);
-
-        // Статичная сетка фона
-        ctx.strokeStyle = 'rgba(0, 50, 0, 0.2)';
-        ctx.lineWidth = 1;
-        for(let i=0; i<w; i+=60) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,h); ctx.stroke(); }
-        for(let i=0; i<h; i+=60) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(w,i); ctx.stroke(); }
-
-        drawHorizon();
         
-        // Барабаны: Направление (X) и Тангаж (Y)
-        drawTape(w * 0.1, h/2, yaw, "DIR_X");
-        drawTape(w * 0.82, h/2, pitch, "DIR_Y", true);
-
-        // Центральный прицел
-        ctx.strokeStyle = isActive ? '#f00' : '#0f0';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(w/2 - 20, h/2); ctx.lineTo(w/2 + 20, h/2);
-        ctx.moveTo(w/2, h/2 - 20); ctx.lineTo(w/2, h/2 + 20);
-        ctx.stroke();
-        ctx.strokeRect(w/2 - 60, h/2 - 40, 120, 80);
-
-        drawTargeting();
-
-        // Телеметрия
-        ctx.fillStyle = '#0f0';
-        ctx.font = '12px monospace';
-        ctx.fillText(`OS: myDRON.v3 // ${new Date().toLocaleTimeString()}`, 20, 30);
-        ctx.fillText(`SENSORS: ${isActive ? 'ONLINE' : 'WAITING'}`, 20, 45);
-
-        // Сканирующая полоса
-        ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
-        ctx.fillRect(0, (frame * 3) % h, w, 4);
-
-        requestAnimationFrame(loop);
-    }
-
-    loop();
+        // ---------- 2. ГИРОСКОП (движение дрона: pitch, roll, yaw компенс) ----------
+        function handleOrientation(event) {
+            if (!sensorsLinked) return;
+            
+            let beta = event.beta;   // -180..180: вперед/назад (pitch)
+            let gamma = event.gamma; // -90..90: крен (roll)
+            let alpha = event.alpha; // 0..360: компас (yaw)
+            
+            if (beta === null || gamma === null) return;
+            
+            // Калибровка: если не откалиброван, установить смещение по первому чтению
+            if (!isCalibrated && sensorsLinked) {
+                calibrateOffset.beta = beta;
+                calibrateOffset.gamma = gamma;
+                isCalibrated = true;
+            }
+            
+            let rawPitch = beta - calibrateOffset.beta;
+            let rawRoll = gamma - calibrateOffset.gamma;
+            
+            // Плавная фильтрация + ограничения для комфортного интерфейса
+            // Pitch: диапазон -30..30 градусов (наклон дрона)
+            pitch = Math.min(28, Math.max(-28, rawPitch * 0.9));
+            roll = Math.min(35, Math.max(-35, rawRoll * 1.1));
+            
+            // Yaw (рыскание) используем для индикатора курса
+            if (alpha !== null) {
+                yaw = alpha; // 0-360 градусов
+            }
+            
+            // Дополнительная динамика скорости/высоты от наклона дрона (иммерсивность)
+            if (sensorsLinked) {
+                // Наклон вперёд увеличивает скорость, назад - замедление
+                let pitchEffect = pitch / 20;
+                speed += (pitchEffect * 0.4) + (Math.random() - 0.5) * 0.2;
+                speed = Math.min(320, Math.max(0, speed));
+                
+                // Изменение высоты от крена и тангажа (имитация набора)
+                let altitudeEffect = (Math.abs(roll) * 0.2) - (pitch * 0.1);
+                altitude += altitudeEffect * 0.5 + (Math.random() - 0.5) * 1.2;
+                altitude = Math.min(12500, Math.max(120, altitude));
+            }
+        }
+        
+        // Инициализация гироскопа с разрешением (iOS и Android)
+        async function initGyroscope() {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // iOS требуется явное разрешение
+                sensorBtn.innerText = "⚡ REQUEST GYRO";
+                sensorBtn.onclick = async () => {
+                    try {
+                        const permission = await DeviceOrientationEvent.requestPermission();
+                        if (permission === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            sensorsLinked = true;
+                            isCalibrated = false; // перекалибровка после получения прав
+                            sensorBtn.innerText = "🔗 GYRO ACTIVE";
+                            sensorBtn.style.background = "rgba(0,40,0,0.9)";
+                            // также пробуем камеру если не активна
+                            if (!cameraActive) initCamera();
+                        } else {
+                            sensorsLinked = false;
+                            sensorBtn.innerText = "❌ GYRO DENIED";
+                        }
+                    } catch(e) {
+                        console.warn(e);
+                        sensorsLinked = false;
+                    }
+                };
+            } else {
+                // Android / десктоп — автоматическое подключение после клика на кнопку
+                sensorBtn.onclick = () => {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                    sensorsLinked = true;
+                    isCalibrated = false;
+                    sensorBtn.innerText = "🔗 GYRO ACTIVE";
+                    if (!cameraActive) initCamera();
+                    // дополнительно: запускаем микрофон
+                    initMicrophone();
+                };
+                // Можно сразу предложить сенсоры по клику, но оставляем кнопку для явного старта
+            }
+        }
+        
+        // ---------- 3. МИКРОФОН (аудио-реактивный HUD + тактильный шум) ----------
+        async function initMicrophone() {
+            if (micActive) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                micStream = stream;
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                audioAnalyser = audioContext.createAnalyser();
+                audioAnalyser.fftSize = 256;
+                source.connect(audioAnalyser);
+                audioDataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+                micActive = true;
+                micStatusDiv.innerHTML = "🎙️ MIC: LIVE | THRUST MOD";
+                // запускаем контекст после взаимодействия
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+                console.log("[HUD] Microphone ready - audio reactive HUD");
+            } catch (err) {
+                console.warn("[HUD] Microphone access denied or error:", err);
+                micStatusDiv.innerHTML = "🎙️ MIC: UNAVAILABLE";
+                micActive = false;
+            }
+        }
+        
+        // Обновление уровня звука для визуальных эффектов (микрофонная пульсация)
+        function updateMicLevel() {
+            if (!micActive || !audioAnalyser || !audioDataArray) {
+                micLevel = 0;
+                return;
+            }
+            audioAnalyser.getByteFrequencyData(audioDataArray);
+            let sum = 0;
+            for (let i = 0; i < audioDataArray.length; i++) {
+                sum += audioDataArray[i];
+            }
+            let avg = sum / (audioDataArray.length || 1);
+            micLevel = Math.min(1, avg / 180); // нормализация 0..1
+            // Дополнительное влияние микрофона на скорость (реакция на шум винтов)
+            if (sensorsLinked && micActive && micLevel > 0.1) {
+                let boost = micLevel * 2.2;
+                speed += boost * 0.25;
+                speed = Math.min(390, speed);
+            }
+        }
+        
+        // ---------- СИМУЛЯЦИЯ ДАННЫХ (если датчики не подключены) ----------
+        function updateSimulatedData() {
+            if (!sensorsLinked) {
+                pitch = Math.sin(frame * 0.012) * 8 + Math.cos(frame * 0.007) * 3;
+                roll = Math.sin(frame * 0.015) * 6 + Math.cos(frame * 0.01) * 2;
+                yaw = (frame * 0.5) % 360;
+                speed += (Math.sin(frame * 0.02) * 0.3) + (Math.random() - 0.5) * 0.6;
+                altitude += (Math.sin(frame * 0.008) * 1.2) + (Math.random() - 0.5) * 1.8;
+                batteryVoltage += (Math.random() - 0.5) * 0.02;
+                rssi += (Math.random() - 0.5) * 0.8;
+            }
+            // ограничения
+            speed = Math.min(520, Math.max(12, speed));
+            altitude = Math.min(13500, Math.max(80, altitude));
+            batteryVoltage = Math.min(28.5, Math.max(21.0, batteryVoltage));
+            rssi = Math.min(100, Math.max(32, rssi));
+            
+            // Эффект alert: мигание, падение rssi при включенной тревоге
+            if (alertMode) {
+                rssi = Math.max(35, rssi - 0.3);
+                if(frame % 60 === 0) speed -= 1.2;
+            }
+        }
+        
+        // ---------- ОТРИСОВКА HUD (FPV стиль, ретро-тактический) ----------
+        function drawFPVHUD() {
+            if (!ctx) return;
+            ctx.clearRect(0, 0, width, height);
+            
+            // 1. Основная сетка и координационная разметка
+            ctx.strokeStyle = '#0f0';
+            ctx.fillStyle = '#0f0';
+            ctx.lineWidth = 1.2;
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = '#0f0';
+            
+            // Сетка с дисторсией (эффект ретро)
+            const step = 45;
+            ctx.globalAlpha = 0.35;
+            for(let i = 0; i < width + step; i += step) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i + Math.sin(frame*0.02)*2, height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(width, i + Math.cos(frame*0.015)*2);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+            
+            // 2. Искусственный горизонт (питч/ролл)
+            ctx.save();
+            ctx.translate(width/2, height/2 + 25);
+            ctx.rotate(roll * Math.PI / 180);
+            // Линии горизонта с градусами
+            ctx.beginPath();
+            ctx.moveTo(-180, pitch * 2.2);
+            ctx.lineTo(180, pitch * 2.2);
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#0f0';
+            ctx.stroke();
+            // центральная марка
+            ctx.beginPath();
+            ctx.moveTo(-25, pitch * 2.2);
+            ctx.lineTo(-12, pitch * 2.2 - 6);
+            ctx.moveTo(25, pitch * 2.2);
+            ctx.lineTo(12, pitch * 2.2 - 6);
+            ctx.stroke();
+            
+            // Градусная шкала тангажа
+            for(let ang = -40; ang <= 40; ang += 10) {
+                let yOff = ang * 1.5 + pitch * 2.2;
+                if(Math.abs(yOff) < 140) {
+                    ctx.beginPath();
+                    ctx.moveTo(ang === 0 ? -40 : -20, yOff);
+                    ctx.lineTo(ang === 0 ? 40 : 20, yOff);
+                    ctx.stroke();
+                    ctx.fillStyle = '#0f0';
+                    ctx.font = "12px monospace";
+                    ctx.fillText(ang + "°", 48, yOff + 4);
+                    ctx.fillText(ang + "°", -68, yOff + 4);
+                }
+            }
+            ctx.restore();
+            
+            // 3. Лента скорости (вертикальная, слева)
+            drawTape(width * 0.08, height/2, speed, "SPD", "km/h", false);
+            // 4. Лента высоты (справа)
+            drawTape(width * 0.92, height/2, altitude, "ALT", "m", true);
+            
+            // 5. Доп. параметры: крен, тангаж, рыскание, батарея, RSSI
+            ctx.font = "bold 13px 'Courier New'";
+            ctx.fillStyle = "#0f0";
+            ctx.fillText(`PITCH ${pitch.toFixed(1)}°`, width*0.05, height*0.12);
+            ctx.fillText(`ROLL ${roll.toFixed(1)}°`, width*0.05, height*0.18);
+            ctx.fillText(`YAW ${Math.floor(yaw)}°`, width*0.05, height*0.24);
+            ctx.fillText(`BAT ${batteryVoltage.toFixed(1)}V`, width*0.05, height*0.30);
+            
+            // RSSI графический индикатор
+            ctx.fillStyle = `rgba(0, 255, 0, ${0.4 + rssi/200})`;
+            ctx.fillRect(width*0.05, height*0.34, (rssi/100)*80, 10);
+            ctx.strokeStyle = '#0f0';
+            ctx.strokeRect(width*0.05, height*0.34, 80, 10);
+            ctx.fillStyle = '#0f0';
+            ctx.fillText(`RSSI ${Math.floor(rssi)}%`, width*0.05, height*0.38);
+            
+            // 6. Тактический компас (на основе yaw)
+            let compassX = width - 90;
+            let compassY = 70;
+            ctx.beginPath();
+            ctx.arc(compassX, compassY, 32, 0, Math.PI*2);
+            ctx.stroke();
+            for(let d=0; d<360; d+=30){
+                let rad = (d - yaw) * Math.PI/180;
+                let x1 = compassX + Math.sin(rad)*25;
+                let y1 = compassY - Math.cos(rad)*25;
+                ctx.fillText(d, x1-5, y1+3);
+            }
+            ctx.fillStyle = '#f80';
+            ctx.beginPath();
+            ctx.moveTo(compassX, compassY-38);
+            ctx.lineTo(compassX-5, compassY-28);
+            ctx.lineTo(compassX+5, compassY-28);
+            ctx.fill();
+            ctx.fillStyle = "#0f0";
+            ctx.fillText("N", compassX-4, compassY-42);
+            
+            // 7. Микрофонная пульсация (дополнительный индикатор)
+            if (micActive) {
+                let pulseSize = 12 + micLevel * 18;
+                ctx.beginPath();
+                ctx.arc(width - 30, height - 40, pulseSize, 0, Math.PI*2);
+                ctx.fillStyle = `rgba(0, 200, 0, ${0.2+micLevel*0.4})`;
+                ctx.fill();
+                ctx.fillStyle = "#0f0";
+                ctx.fillText("MIC", width-42, height-32);
+            }
+            
+            // 8. ALERT MODE – красная индикация
+            if(alertMode && (Math.floor(frame/10) % 2 === 0)) {
+                ctx.fillStyle = "rgba(255, 0, 0, 0.25)";
+                ctx.fillRect(0,0,width,height);
+                ctx.fillStyle = "#f44";
+                ctx.font = "bold 24px monospace";
+                ctx.fillText("⚠️ CRITICAL ALERT ⚠️", width/2-130, height*0.2);
+            }
+            
+            // 9. Нижняя строка статуса + телеметрия
+            let statusStr = sensorsLinked ? "◉ GYRO LINK" : "◎ GYRO OFFLINE";
+            statusStr += cameraActive ? " | 📷 FPV" : " | 🎥 CAM DISABLED";
+            ctx.fillStyle = "#0f0";
+            ctx.font = "10px monospace";
+            ctx.fillText(statusStr, 20, height-18);
+            ctx.fillText(`DRONE SYS v.4.06 | ${new Date().toLocaleTimeString()}`, width-230, height-12);
+        }
+        
+        // Рисование ленты (speed/alt tape) с цифрами и шкалой
+        function drawTape(x, y, value, label, unit, alignRight) {
+            ctx.save();
+            ctx.font = "bold 14px 'Courier New'";
+            ctx.fillStyle = "#0f0";
+            ctx.fillText(label, alignRight ? x-50 : x+5, y-45);
+            ctx.font = "10px monospace";
+            let range = 140;
+            let stepVal = 20;
+            let startVal = Math.floor(value/stepVal)*stepVal - 60;
+            ctx.beginPath();
+            ctx.strokeStyle = "#0f0";
+            ctx.lineWidth = 1.2;
+            for(let v = startVal; v <= startVal+120; v+= stepVal){
+                let ty = y + (value - v)*1.4;
+                if(ty > 30 && ty < height-30){
+                    ctx.beginPath();
+                    ctx.moveTo(alignRight ? x-15 : x+15, ty);
+                    ctx.lineTo(alignRight ? x : x+25, ty);
+                    ctx.stroke();
+                    ctx.fillText(Math.floor(v), alignRight ? x-40 : x+18, ty+4);
+                }
+            }
+            // центральный маркер
+            ctx.fillStyle = "rgba(0,255,0,0.2)";
+            ctx.fillRect(alignRight ? x-40 : x, y-10, 35, 20);
+            ctx.fillStyle = "#0f0";
+            ctx.font = "bold 16px monospace";
+            let valText = Math.floor(value);
+            ctx.fillText(valText, alignRight ? x-30 : x+8, y+6);
+            ctx.font = "9px monospace";
+            ctx.fillText(unit, alignRight ? x-14 : x+38, y+4);
+            ctx.restore();
+        }
+        
+        // ---------- Дополнительно: аудио-реактивный эффект ----------
+        function applyAudioToVisuals() {
+            if(micActive && micLevel > 0.1){
+                // легкое изменение прозрачности сетки от микрофона
+                // и небольшой глитч
+                if(micLevel > 0.6 && frame % 4 === 0){
+                    ctx.fillStyle = "rgba(0,255,0,0.08)";
+                    ctx.fillRect(0,0,width,height);
+                }
+            }
+        }
+        
+        // ---------- Общий цикл анимации ----------
+        let lastTimestamp = 0;
+        function animate() {
+            frame++;
+            updateSimulatedData();
+            updateMicLevel();
+            drawFPVHUD();
+            applyAudioToVisuals();
+            
+            // Эффект "бегущей строки сканирования" (ретро)
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.03)';
+            ctx.fillRect(0, (frame * 3) % height, width, 4);
+            requestAnimationFrame(animate);
+        }
+        
+        // ---------- События кнопок ----------
+        function toggleAlert() {
+            alertMode = !alertMode;
+            alertBtn.style.boxShadow = alertMode ? "0 0 18px red" : "0 0 5px #0f0";
+            alertBtn.style.borderColor = alertMode ? "#f00" : "#0f0";
+        }
+        
+        function resetSystem() {
+            speed = 126;
+            altitude = 7820;
+            pitch = 0;
+            roll = 0;
+            alertMode = false;
+            if(!sensorsLinked){
+                // сброс симуляции
+            }
+            batteryVoltage = 24.8;
+            rssi = 87;
+            alertBtn.style.boxShadow = "0 0 5px #0f0";
+            alertBtn.style.borderColor = "#0f0";
+        }
+        
+        // Привязка действий и инициализация
+        alertBtn.onclick = toggleAlert;
+        resetBtn.onclick = resetSystem;
+        
+        // автостарт камеры при загрузке (фоновая)
+        initCamera();
+        initGyroscope(); // включаем гироскоп после взаимодействия с кнопкой
+        
+        // дополнительно микрофон запустится при клике на сенсор (user gesture)
+        // а также повесим событие на кнопку сенсора, чтобы активировать микрофон по желанию пилота
+        const originalSensorHandler = sensorBtn.onclick;
+        sensorBtn.onclick = async (e) => {
+            if(originalSensorHandler) await originalSensorHandler(e);
+            if(!micActive) {
+                await initMicrophone();
+                if(audioContext && audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
+            }
+            if(!cameraActive) initCamera();
+        };
+        
+        // Запуск рендера
+        animate();
+        
+        // iOS / Android: гарантировать возобновление аудиоконтекста при первом касании
+        document.body.addEventListener('touchstart', () => {
+            if(audioContext && audioContext.state === 'suspended') audioContext.resume();
+        }, { once: true });
+        
+        // лог успешного старта
+        console.log("FPV Tactical HUD | Ready | Sensors, Camera, Mic");
+    })();
 </script>
 </body>
 </html>
