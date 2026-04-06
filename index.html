@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FPV HUD | REAL GYRO DATA</title>
+    <title>FPV HUD | REAL GYRO + COMPASS</title>
     <style>
         * {
             margin: 0;
@@ -29,7 +29,7 @@
             height: 100%;
             object-fit: cover;
             z-index: 1;
-            filter: grayscale(0.7) brightness(0.55) contrast(1.5) sepia(0.2) hue-rotate(85deg);
+            filter: grayscale(0.65) brightness(0.58) contrast(1.45) sepia(0.2) hue-rotate(85deg);
         }
 
         .crt-overlay {
@@ -38,7 +38,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: repeating-linear-gradient(0deg, rgba(0,20,0,0.15) 0px, rgba(0,20,0,0.15) 2px, transparent 2px, transparent 5px);
+            background: repeating-linear-gradient(0deg, rgba(0,20,0,0.12) 0px, rgba(0,20,0,0.12) 2px, transparent 2px, transparent 5px);
             pointer-events: none;
             z-index: 10;
         }
@@ -60,7 +60,7 @@
             left: 12px;
             right: 12px;
             z-index: 20;
-            background: rgba(0, 10, 0, 0.75);
+            background: rgba(0, 10, 0, 0.8);
             backdrop-filter: blur(10px);
             border-radius: 20px;
             padding: 8px 16px;
@@ -85,7 +85,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.95);
+            background: rgba(0,0,0,0.96);
             backdrop-filter: blur(12px);
             z-index: 100;
             display: flex;
@@ -114,6 +114,14 @@
             100% { transform: rotate(360deg); }
         }
 
+        .permission-text {
+            font-size: 13px;
+            max-width: 280px;
+            border-left: 2px solid #0f0;
+            padding-left: 16px;
+            text-align: left;
+        }
+
         @media (max-width: 600px) {
             .status-panel { font-size: 7px; padding: 6px 12px; bottom: 8px; left: 8px; right: 8px; }
             .status-left { gap: 8px; }
@@ -127,28 +135,33 @@
 <canvas id="hudCanvas"></canvas>
 <div class="status-panel">
     <div class="status-left">
-        <span>🎯 GYRO: <span id="gyroStatus">WAITING</span></span>
-        <span>📷 CAM: <span id="camStatus">WAITING</span></span>
-        <span>🎙️ MIC: <span id="micStatus">OFF</span></span>
+        <span>🔄 GYRO: <span id="gyroStatus">⏳</span></span>
+        <span>🧭 COMPASS: <span id="compassStatus">⏳</span></span>
+        <span>📷 CAM: <span id="camStatus">⏳</span></span>
     </div>
-    <div>📐 REAL SENSOR DATA</div>
+    <div>🎯 REAL SENSORS</div>
 </div>
 <div class="permission-overlay" id="permissionOverlay">
     <div class="loader"></div>
-    <div style="font-size: 14px; max-width: 280px; text-align: center;">🔐 ДОСТУП К ДАТЧИКАМ<br>КАМЕРА • ГИРОСКОП</div>
+    <div class="permission-text">
+        🔐 ТРЕБУЮТСЯ РАЗРЕШЕНИЯ:<br>
+        • Движение/гироскоп (тангаж/крен)<br>
+        • Геолокация (компас/направление)<br>
+        • Камера (FPV вид)
+    </div>
     <div style="font-size: 10px; opacity:0.7;">FPV TACTICAL HUD | РЕАЛЬНЫЕ ДАННЫЕ</div>
 </div>
 
 <script>
     (function(){
-        // Элементы
+        // Элементы DOM
         const canvas = document.getElementById('hudCanvas');
         const ctx = canvas.getContext('2d');
         const video = document.getElementById('camVideo');
         const permissionOverlay = document.getElementById('permissionOverlay');
         const gyroStatusSpan = document.getElementById('gyroStatus');
+        const compassStatusSpan = document.getElementById('compassStatus');
         const camStatusSpan = document.getElementById('camStatus');
-        const micStatusSpan = document.getElementById('micStatus');
         
         let width, height;
         let frame = 0;
@@ -160,78 +173,123 @@
         window.addEventListener('resize', resize);
         resize();
         
-        // ========== РЕАЛЬНЫЕ ДАННЫЕ ГИРОСКОПА ==========
-        let pitch = 0;      // тангаж (вперёд/назад)
-        let roll = 0;       // крен (влево/вправо)
-        let yaw = 0;        // рыскание (компас)
+        // ========== РЕАЛЬНЫЕ ДАННЫЕ С ДАТЧИКОВ ==========
+        let pitch = 0;      // тангаж (наклон вперёд/назад) - из гироскопа
+        let roll = 0;       // крен (наклон влево/вправо) - из гироскопа
+        let heading = 0;    // направление (азимут) - из компаса/геолокации
         
         let gyroActive = false;
+        let compassActive = false;
         let cameraActive = false;
         
-        // Калибровка (обнуляем положение телефона при старте)
+        // Калибровка гироскопа (обнуляем положение при старте)
         let calibrationPitch = null;
         let calibrationRoll = null;
         
         // Телеметрия (реагирует на реальные наклоны)
-        let speed = 120;
-        let altitude = 3000;
-        let battery = 25.2;
-        let rssi = 85;
+        let speed = 110;
+        let altitude = 2500;
+        let battery = 25.4;
+        let rssi = 88;
         
-        // ========== 1. ГИРОСКОП - ТОЛЬКО РЕАЛЬНЫЕ ДАННЫЕ, БЕЗ ФЕЙКОВ ==========
+        // ========== 1. ГИРОСКОП (тангаж и крен) ==========
         function onDeviceOrientation(event) {
             if (!gyroActive) return;
             
-            // Получаем сырые значения от датчика
-            let beta = event.beta;    // -180..180 (тангаж)
-            let gamma = event.gamma;  // -90..90 (крен)
-            let alpha = event.alpha;  // 0..360 (рыскание)
+            let beta = event.beta;    // тангаж -180..180
+            let gamma = event.gamma;  // крен -90..90
             
             if (beta === null || gamma === null) return;
             
-            // КАЛИБРОВКА при первом получении данных
+            // Калибровка при первом получении
             if (calibrationPitch === null) {
                 calibrationPitch = beta;
                 calibrationRoll = gamma;
-                console.log("Calibrated: pitch offset=" + calibrationPitch + " roll offset=" + calibrationRoll);
+                console.log("Gyro calibrated: pitch offset=" + calibrationPitch + ", roll offset=" + calibrationRoll);
             }
             
-            // РЕАЛЬНЫЕ углы относительно калибровки (без фильтров, без сглаживания)
+            // РЕАЛЬНЫЕ углы относительно калибровки (без фильтров)
             pitch = beta - calibrationPitch;
             roll = gamma - calibrationRoll;
             
             // Ограничиваем для корректного отображения
-            pitch = Math.min(35, Math.max(-35, pitch));
-            roll = Math.min(45, Math.max(-45, roll));
+            pitch = Math.min(40, Math.max(-40, pitch));
+            roll = Math.min(50, Math.max(-50, roll));
             
-            if (alpha !== null) {
-                yaw = alpha;
-            }
-            
-            // Реальное влияние на телеметрию (наклон вперёд = разгон)
-            let pitchEffect = pitch / 20;
-            speed += pitchEffect * 0.5;
-            speed = Math.min(450, Math.max(20, speed));
+            // Влияние на телеметрию (наклон вперёд = ускорение)
+            let pitchEffect = pitch / 18;
+            speed += pitchEffect * 0.55;
+            speed = Math.min(480, Math.max(15, speed));
             
             // Влияние на высоту
-            let altEffect = (Math.abs(roll) * 0.15) - (pitch * 0.1);
-            altitude += altEffect * 0.5;
-            altitude = Math.min(12000, Math.max(200, altitude));
+            let altEffect = (Math.abs(roll) * 0.12) - (pitch * 0.08);
+            altitude += altEffect * 0.6;
+            altitude = Math.min(13000, Math.max(150, altitude));
             
             // Батарея и сигнал
-            battery += (Math.random() - 0.5) * 0.01;
-            battery = Math.min(28, Math.max(22, battery));
-            rssi += (Math.random() - 0.5) * 0.3;
-            rssi = Math.min(99, Math.max(40, rssi));
+            battery += (Math.random() - 0.5) * 0.008;
+            battery = Math.min(28.2, Math.max(21.8, battery));
+            rssi += (Math.random() - 0.5) * 0.25;
+            rssi = Math.min(99, Math.max(42, rssi));
         }
         
-        // Инициализация гироскопа с поддержкой iOS и Android
+        // ========== 2. КОМПАС (направление/азимут) через Geolocation ==========
+        // На Android 13+ для получения альфа (рыскания) нужно разрешение на геолокацию
+        function initCompass() {
+            if ('geolocation' in navigator) {
+                // Запрашиваем геолокацию для получения направления
+                navigator.geolocation.watchPosition(
+                    (position) => {
+                        if (position.coords.heading !== null) {
+                            // heading - это направление движения (0=север, 90=восток)
+                            heading = position.coords.heading;
+                            compassActive = true;
+                            compassStatusSpan.innerText = "OK";
+                            compassStatusSpan.style.color = "#0f0";
+                            console.log("Compass heading: " + heading);
+                        } else {
+                            // Если heading нет, пробуем deviceorientation alpha
+                            compassStatusSpan.innerText = "NO DATA";
+                        }
+                    },
+                    (error) => {
+                        console.warn("Geolocation error:", error);
+                        compassStatusSpan.innerText = "DENIED";
+                        compassStatusSpan.style.color = "#f66";
+                        // Fallback: пробуем альфа из deviceorientation
+                        fallbackToAlpha();
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 0,
+                        timeout: 5000
+                    }
+                );
+            } else {
+                compassStatusSpan.innerText = "NOT SUPPORT";
+                fallbackToAlpha();
+            }
+        }
+        
+        // Fallback: используем альфа (рыскание) из deviceorientation
+        function fallbackToAlpha() {
+            let alphaHandler = (event) => {
+                if (event.alpha !== null && !compassActive) {
+                    heading = event.alpha;
+                    compassActive = true;
+                    compassStatusSpan.innerText = "ALPHA";
+                    compassStatusSpan.style.color = "#fa0";
+                }
+            };
+            window.addEventListener('deviceorientation', alphaHandler);
+        }
+        
+        // ========== 3. ГИРОСКОП С ПОДДЕРЖКОЙ iOS И ANDROID ==========
         function initGyro() {
-            // Для Android: событие доступно сразу
             if (typeof DeviceOrientationEvent !== 'undefined') {
-                // Проверяем, нужно ли разрешение (iOS)
+                // iOS требует явного разрешения
                 if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    // iOS: показываем запрос
+                    // iOS: показываем системный диалог
                     DeviceOrientationEvent.requestPermission()
                         .then(permission => {
                             if (permission === 'granted') {
@@ -239,6 +297,7 @@
                                 gyroActive = true;
                                 gyroStatusSpan.innerText = "ACTIVE";
                                 gyroStatusSpan.style.color = "#0f0";
+                                console.log("Gyro active (iOS)");
                             } else {
                                 gyroStatusSpan.innerText = "DENIED";
                                 gyroStatusSpan.style.color = "#f66";
@@ -246,43 +305,25 @@
                             }
                         })
                         .catch(err => {
-                            console.error("Gyro error:", err);
+                            console.error("Gyro permission error:", err);
                             gyroStatusSpan.innerText = "ERROR";
                             enableDemoMode();
                         });
                 } else {
-                    // Android / десктоп: подключаем сразу
+                    // Android / десктоп: подключаем сразу без запроса
                     window.addEventListener('deviceorientation', onDeviceOrientation);
                     gyroActive = true;
                     gyroStatusSpan.innerText = "ACTIVE";
                     gyroStatusSpan.style.color = "#0f0";
-                    console.log("Gyro connected (Android mode)");
+                    console.log("Gyro active (Android)");
                 }
             } else {
-                gyroStatusSpan.innerText = "NOT SUPPORTED";
+                gyroStatusSpan.innerText = "NOT SUPPORT";
                 enableDemoMode();
             }
         }
         
-        // РЕЖИМ ДЕМО (только если гироскоп реально недоступен)
-        let demoMode = false;
-        function enableDemoMode() {
-            demoMode = true;
-            gyroActive = false;
-            console.log("Demo mode active - gyro unavailable");
-        }
-        
-        // Демо-симуляция (минимальная, только если нет гироскопа)
-        function updateDemo() {
-            if (!demoMode) return;
-            pitch = Math.sin(Date.now() * 0.002) * 12;
-            roll = Math.cos(Date.now() * 0.0025) * 8;
-            yaw = (Date.now() * 0.05) % 360;
-            speed += (Math.random() - 0.5) * 0.3;
-            altitude += (Math.random() - 0.5) * 1;
-        }
-        
-        // ========== 2. КАМЕРА ==========
+        // ========== 4. КАМЕРА ==========
         async function initCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -309,19 +350,20 @@
             }
         }
         
-        // ========== 3. МИКРОФОН (опционально) ==========
-        let micActive = false;
-        async function initMicrophone() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                micActive = true;
-                micStatusSpan.innerText = "ON";
-                micStatusSpan.style.color = "#0f0";
-                stream.getTracks().forEach(track => track.stop()); // просто проверка доступа
-            } catch(e) {
-                micActive = false;
-                micStatusSpan.innerText = "OFF";
-            }
+        // ========== ДЕМО-РЕЖИМ (только если реальные датчики недоступны) ==========
+        let demoMode = false;
+        function enableDemoMode() {
+            demoMode = true;
+            console.log("Demo mode active - using simulated data");
+        }
+        
+        function updateDemo() {
+            if (!demoMode) return;
+            pitch = Math.sin(Date.now() * 0.002) * 10;
+            roll = Math.cos(Date.now() * 0.0025) * 7;
+            heading = (Date.now() * 0.03) % 360;
+            speed += (Math.random() - 0.5) * 0.4;
+            altitude += (Math.random() - 0.5) * 1.2;
         }
         
         // ========== ОТРИСОВКА HUD ==========
@@ -330,7 +372,19 @@
             ctx.fillStyle = "#0f0";
             ctx.fillText(`PITCH ${pitch.toFixed(1)}°`, 18, 48);
             ctx.fillText(`ROLL ${roll.toFixed(1)}°`, 18, 78);
-            ctx.fillText(`YAW ${Math.floor(yaw)}°`, 18, 108);
+            
+            // Отображаем реальный компас (азимут)
+            let compassDirection = "";
+            if (heading >= 337.5 || heading < 22.5) compassDirection = "N";
+            else if (heading >= 22.5 && heading < 67.5) compassDirection = "NE";
+            else if (heading >= 67.5 && heading < 112.5) compassDirection = "E";
+            else if (heading >= 112.5 && heading < 157.5) compassDirection = "SE";
+            else if (heading >= 157.5 && heading < 202.5) compassDirection = "S";
+            else if (heading >= 202.5 && heading < 247.5) compassDirection = "SW";
+            else if (heading >= 247.5 && heading < 292.5) compassDirection = "W";
+            else if (heading >= 292.5 && heading < 337.5) compassDirection = "NW";
+            
+            ctx.fillText(`HEADING ${Math.floor(heading)}° ${compassDirection}`, 18, 108);
             ctx.fillText(`BAT ${battery.toFixed(1)}V`, 18, 138);
             
             ctx.fillStyle = `rgba(0,255,0,0.7)`;
@@ -345,27 +399,55 @@
             let cx = width - 85;
             let cy = 80;
             let r = 55;
+            
             ctx.beginPath();
             ctx.arc(cx, cy, r, 0, Math.PI*2);
             ctx.strokeStyle = "#0f0";
             ctx.stroke();
             
-            for(let deg = 0; deg < 360; deg += 30) {
-                let rad = (deg - yaw) * Math.PI/180;
-                let x = cx + Math.sin(rad) * (r-10);
-                let y = cy - Math.cos(rad) * (r-10);
-                let label = deg===0 ? "N" : (deg===90 ? "E" : (deg===180 ? "S" : (deg===270 ? "W" : deg)));
+            // Рисуем метки компаса (N, E, S, W)
+            let directions = [
+                { deg: 0, label: "N", offset: 0 },
+                { deg: 45, label: "NE", offset: 0 },
+                { deg: 90, label: "E", offset: 0 },
+                { deg: 135, label: "SE", offset: 0 },
+                { deg: 180, label: "S", offset: 0 },
+                { deg: 225, label: "SW", offset: 0 },
+                { deg: 270, label: "W", offset: 0 },
+                { deg: 315, label: "NW", offset: 0 }
+            ];
+            
+            for(let d of directions) {
+                // Поворачиваем метку относительно текущего курса
+                let angle = (d.deg - heading) * Math.PI / 180;
+                let x = cx + Math.sin(angle) * (r - 12);
+                let y = cy - Math.cos(angle) * (r - 12);
                 ctx.fillStyle = "#0f0";
-                ctx.font = (deg%90===0) ? "bold 13px monospace" : "9px monospace";
-                ctx.fillText(label, x-5, y+4);
+                ctx.font = (d.label === "N") ? "bold 14px monospace" : "11px monospace";
+                ctx.fillText(d.label, x-6, y+5);
             }
             
+            // Стрелка направления (всегда показывает на север относительно курса)
             ctx.beginPath();
-            ctx.moveTo(cx, cy - r + 6);
-            ctx.lineTo(cx-4, cy - r + 13);
-            ctx.lineTo(cx+4, cy - r + 13);
+            let arrowAngle = (0 - heading) * Math.PI / 180;
+            let arrowX = cx + Math.sin(arrowAngle) * (r - 8);
+            let arrowY = cy - Math.cos(arrowAngle) * (r - 8);
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - 5, arrowY - 10);
+            ctx.lineTo(arrowX + 5, arrowY - 10);
             ctx.fillStyle = "#fa0";
             ctx.fill();
+            
+            // Центральная точка
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4, 0, Math.PI*2);
+            ctx.fillStyle = "#0f0";
+            ctx.fill();
+            
+            // Текст текущего курса
+            ctx.font = "bold 10px monospace";
+            ctx.fillStyle = "#0f0";
+            ctx.fillText(`${Math.floor(heading)}°`, cx-15, cy+r+12);
         }
         
         function drawTape(x, y, value, label, unit, alignRight) {
@@ -398,33 +480,35 @@
             ctx.translate(width/2, height/2 + 20);
             ctx.rotate(roll * Math.PI / 180);
             let pitchOffset = pitch * 2.2;
+            
             ctx.beginPath();
-            ctx.moveTo(-280, pitchOffset);
-            ctx.lineTo(280, pitchOffset);
+            ctx.moveTo(-300, pitchOffset);
+            ctx.lineTo(300, pitchOffset);
             ctx.lineWidth = 2;
+            ctx.strokeStyle = "#0f0";
             ctx.stroke();
             
             for(let ang = -30; ang <= 30; ang += 10) {
                 let yOff = ang * 1.6 + pitchOffset;
-                if(Math.abs(yOff) < 150) {
+                if(Math.abs(yOff) < 160) {
                     ctx.beginPath();
-                    ctx.moveTo(ang===0 ? -50 : -28, yOff);
-                    ctx.lineTo(ang===0 ? 50 : 28, yOff);
+                    ctx.moveTo(ang===0 ? -55 : -30, yOff);
+                    ctx.lineTo(ang===0 ? 55 : 30, yOff);
                     ctx.stroke();
                     ctx.fillStyle = "#0f0";
                     ctx.font = "9px monospace";
-                    ctx.fillText(ang+"°", 58, yOff+4);
-                    ctx.fillText(ang+"°", -76, yOff+4);
+                    ctx.fillText(ang+"°", 62, yOff+4);
+                    ctx.fillText(ang+"°", -80, yOff+4);
                 }
             }
             ctx.restore();
             
             // Прицельная метка
             ctx.beginPath();
-            ctx.moveTo(width/2 - 12, height/2 + 18);
-            ctx.lineTo(width/2 - 3, height/2 + 18);
-            ctx.moveTo(width/2 + 3, height/2 + 18);
-            ctx.lineTo(width/2 + 12, height/2 + 18);
+            ctx.moveTo(width/2 - 15, height/2 + 18);
+            ctx.lineTo(width/2 - 4, height/2 + 18);
+            ctx.moveTo(width/2 + 4, height/2 + 18);
+            ctx.lineTo(width/2 + 15, height/2 + 18);
             ctx.moveTo(width/2, height/2 + 8);
             ctx.lineTo(width/2, height/2 + 28);
             ctx.stroke();
@@ -435,8 +519,9 @@
             ctx.font = "8px monospace";
             ctx.fillStyle = "#0f0";
             ctx.fillText(`${time} | ALT ${Math.floor(altitude)}m | SPD ${Math.floor(speed)}km/h`, 16, height-12);
-            if(gyroActive) {
-                ctx.fillText("⚡ LIVE GYRO", width-85, height-12);
+            
+            if(gyroActive && compassActive) {
+                ctx.fillText("✅ REAL SENSORS", width-105, height-12);
             } else if(demoMode) {
                 ctx.fillText("⚠️ DEMO MODE", width-85, height-12);
             }
@@ -467,13 +552,14 @@
             requestAnimationFrame(animate);
         }
         
-        // ========== ЗАПУСК ==========
+        // ========== ЗАПУСК С АВТОМАТИЧЕСКИМИ ЗАПРОСАМИ ==========
         async function start() {
+            // Запрашиваем все разрешения последовательно
             await initCamera();
-            initMicrophone();
-            initGyro();  // гироскоп запускается отдельно
+            initGyro();
+            initCompass();  // Запрашивает геолокацию для компаса
             
-            // Скрываем оверлей через 1 секунду
+            // Скрываем оверлей через 2 секунды (даём время на запросы)
             setTimeout(() => {
                 if(permissionOverlay) {
                     permissionOverlay.style.opacity = "0";
@@ -481,15 +567,28 @@
                         permissionOverlay.style.display = "none";
                     }, 500);
                 }
-            }, 1000);
+            }, 2000);
+            
+            // Если через 3 секунды гироскоп не активен - включаем демо
+            setTimeout(() => {
+                if(!gyroActive && !demoMode) {
+                    enableDemoMode();
+                    gyroStatusSpan.innerText = "DEMO";
+                    gyroStatusSpan.style.color = "#fa0";
+                }
+                if(!compassActive) {
+                    compassStatusSpan.innerText = "DEMO";
+                    compassStatusSpan.style.color = "#fa0";
+                    if(!demoMode) heading = (Date.now() * 0.03) % 360;
+                }
+            }, 3000);
         }
         
         start();
         animate();
         resize();
         
-        // Для iOS: возобновление аудио не нужно, но оставим на всякий случай
-        console.log("FPV HUD Started - waiting for gyro data");
+        console.log("FPV HUD Started - waiting for sensor permissions");
     })();
 </script>
 </body>
