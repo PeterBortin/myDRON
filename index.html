@@ -3,160 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FPV SYSTEM | MIL-SPEC</title>
+    <title>ULTIMATE FPV HUD</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
-        
-        /* Видео с фиксами для iOS */
-        #cam {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; z-index: 1;
-            filter: brightness(0.8) contrast(1.2) sepia(0.2) hue-rotate(80deg);
-        }
-
-        #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
-
-        /* Оверлей запуска */
-        #boot {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 100; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; color: #0f0; text-align: center;
-        }
-
-        .btn-init {
-            border: 1px solid #0f0; background: rgba(0,255,0,0.1); color: #0f0;
-            padding: 20px 50px; font-size: 16px; cursor: pointer; font-family: inherit;
-            box-shadow: 0 0 15px rgba(0,255,0,0.2);
-        }
-
-        #log { position: fixed; top: 10px; left: 10px; color: #0f0; font-size: 10px; z-index: 10; pointer-events: none; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #0f0; font-family: monospace; overflow: hidden; }
+        #v { position: fixed; top:0; left:0; width:100%; height:100%; object-fit: cover; z-index:1; }
+        #c { position: absolute; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none; }
+        #ui { position: fixed; top:0; left:0; width:100%; height:100%; z-index:100; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .b { border: 2px solid #0f0; background: none; color: #0f0; padding: 20px; font-size: 20px; cursor: pointer; }
+        #debug { position: fixed; top: 10px; left: 10px; z-index: 200; font-size: 10px; background: rgba(0,0,0,0.5); pointer-events: none; }
     </style>
 </head>
 <body>
 
-<div id="log">SYSTEM READY. AWAITING LINK...</div>
+<div id="debug">LOG: STANDBY...</div>
+<video id="v" autoplay playsinline muted webkit-playsinline></video>
+<canvas id="c"></canvas>
 
-<div id="boot">
-    <h1 style="letter-spacing: 5px;">FPV HUD V5.0</h1>
-    <div style="margin: 20px; font-size: 12px; color: #0a0;">[SECURE LINK REQUIRED]</div>
-    <button class="btn-init" id="startBtn">INITIALIZE SYSTEM</button>
+<div id="ui">
+    <div style="margin-bottom: 20px; text-align: center;">
+        <h2>FPV SYSTEM BOOT</h2>
+        <p>iOS/Android Sensor Access</p>
+    </div>
+    <button class="b" id="go">INITIALIZE LINK</button>
 </div>
 
-<video id="cam" autoplay playsinline muted webkit-playsinline></video>
-<canvas id="hud"></canvas>
-
 <script>
-    const log = (msg) => { document.getElementById('log').innerText += "\n" + msg; console.log(msg); };
-    const canvas = document.getElementById('hud');
+    const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
-    const video = document.getElementById('cam');
-    
-    let state = { p: 0, r: 0, h: 0, active: false };
+    const video = document.getElementById('v');
+    const debug = document.getElementById('debug');
+    const ui = document.getElementById('ui');
 
-    function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resize);
-    resize();
+    let data = { p: 0, r: 0, h: 0, s: 0, a: 120, lat: 0, lon: 0 };
 
-    document.getElementById('startBtn').addEventListener('click', async () => {
-        log("STARTING SENSORS...");
-        
-        // 1. КАМЕРА
+    function log(msg) { debug.innerText += "\n" + msg; }
+
+    // Главная функция запуска
+    document.getElementById('go').addEventListener('click', async function() {
+        log("INIT SEQUENCE START...");
+
+        // 1. Пытаемся запустить камеру
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" }, 
-                audio: false 
-            });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
             video.srcObject = stream;
-            // Важно для iOS: явно вызвать play() после установки srcObject
-            await video.play();
-            log("CAMERA: OK");
-        } catch (e) {
-            log("CAMERA: FAIL - " + e.message);
-        }
+            video.play();
+            log("CAM: OK");
+        } catch(e) { log("CAM: ERROR " + e.message); }
 
-        // 2. ГИРОСКОП (iOS 13+)
-        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // 2. Датчики движения (iOS 13+)
+        if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
             try {
-                const res = await DeviceOrientationEvent.requestPermission();
-                if (res === 'granted') {
-                    window.addEventListener('deviceorientation', updateMotion, true);
+                const permission = await DeviceOrientationEvent.requestPermission();
+                if (permission === 'granted') {
+                    window.addEventListener('deviceorientation', updateSensors, true);
                     log("GYRO: GRANTED");
-                }
-            } catch (e) {
-                log("GYRO: ERROR");
-            }
+                } else { log("GYRO: DENIED"); }
+            } catch(e) { log("GYRO: REQ ERROR"); }
         } else {
-            window.addEventListener('deviceorientation', updateMotion, true);
-            log("GYRO: LEGACY OK");
+            window.addEventListener('deviceorientation', updateSensors, true);
+            log("GYRO: ANDROID/OLD IOS OK");
         }
 
-        state.active = true;
-        document.getElementById('boot').style.display = 'none';
-        animate();
+        // 3. Геолокация (для скорости и координат)
+        navigator.geolocation.watchPosition((pos) => {
+            data.s = pos.coords.speed || 0;
+            data.lat = pos.coords.latitude;
+            data.lon = pos.coords.longitude;
+            log("GPS: ACTIVE");
+        }, (err) => log("GPS: OFF"), { enableHighAccuracy: true });
+
+        ui.style.display = 'none';
+        requestAnimationFrame(loop);
     });
 
-    function updateMotion(e) {
-        // Кроссплатформенный расчет углов
-        state.p = e.beta;  // Pitch
-        state.r = e.gamma; // Roll
-        // Компас специально для iOS
-        state.h = e.webkitCompassHeading || e.alpha || 0;
+    function updateSensors(e) {
+        // Крен и тангаж
+        data.p = e.beta; 
+        data.r = e.gamma;
+        // Направление (iOS использует webkitCompassHeading)
+        data.h = e.webkitCompassHeading || e.alpha || 0;
     }
 
-    function draw() {
-        const w = canvas.width, h = canvas.height;
+    function loop() {
+        const w = canvas.width = window.innerWidth;
+        const h = canvas.height = window.innerHeight;
         const cx = w/2, cy = h/2;
-        ctx.clearRect(0, 0, w, h);
 
+        ctx.clearRect(0,0,w,h);
         ctx.strokeStyle = '#0f0';
         ctx.fillStyle = '#0f0';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
 
-        // --- Искусственный горизонт ---
+        // Рисуем горизонт
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.rotate(state.r * Math.PI / 180);
+        ctx.rotate(data.r * Math.PI / 180);
         
-        let pOffset = state.p * 5;
+        let pitchShift = data.p * 5;
         
+        // Линия горизонта
         ctx.beginPath();
-        ctx.moveTo(-w/3, pOffset); ctx.lineTo(-50, pOffset);
-        ctx.moveTo(50, pOffset); ctx.lineTo(w/3, pOffset);
+        ctx.moveTo(-200, pitchShift); ctx.lineTo(-40, pitchShift);
+        ctx.moveTo(40, pitchShift); ctx.lineTo(200, pitchShift);
         ctx.stroke();
-        
-        // Штрихи тангажа
-        ctx.font = '10px monospace';
-        for(let i=-40; i<=40; i+=10) {
-            let y = pOffset - (i * 5);
-            ctx.globalAlpha = 0.4;
-            ctx.beginPath(); ctx.moveTo(-30, y); ctx.lineTo(30, y); ctx.stroke();
-            ctx.fillText(i, 35, y + 4);
+
+        // Шкала
+        for(let i=-50; i<=50; i+=10) {
+            if(i===0) continue;
+            let y = pitchShift - (i * 5);
+            ctx.globalAlpha = 0.3;
+            ctx.beginPath(); ctx.moveTo(-20, y); ctx.lineTo(20, y); ctx.stroke();
+            ctx.font = "10px monospace";
+            ctx.fillText(i, 25, y+4);
         }
         ctx.restore();
 
-        // --- Статичный прицел ---
+        // Данные по бокам
         ctx.globalAlpha = 1;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 10, 0, Math.PI*2);
-        ctx.moveTo(cx-20, cy); ctx.lineTo(cx-10, cy);
-        ctx.moveTo(cx+20, cy); ctx.lineTo(cx+10, cy);
-        ctx.stroke();
-
-        // --- Компас ---
-        ctx.fillText("HDG: " + Math.round(state.h).toString().padStart(3, '0'), cx - 25, 50);
+        ctx.font = "14px monospace";
         
-        // --- Декоративные элементы по углам ---
-        ctx.strokeRect(20, 20, 60, 20);
-        ctx.fillText("VCC: 24.1V", 25, 34);
-        ctx.fillText("RSSI: 99%", 25, 55);
-    }
+        // Левая панель (Скорость)
+        ctx.strokeRect(20, cy-60, 50, 120);
+        ctx.fillText("SPD", 25, cy-70);
+        ctx.fillText(Math.round(data.s * 3.6), 35, cy+5); // м/с в км/ч
 
-    function animate() {
-        draw();
-        requestAnimationFrame(animate);
+        // Правая панель (Высота)
+        ctx.strokeRect(w-70, cy-60, 50, 120);
+        ctx.fillText("ALT", w-65, cy-70);
+        ctx.fillText(Math.round(data.a), w-60, cy+5);
+
+        // Компас (Верх)
+        ctx.fillText("HDG: " + Math.round(data.h) + "°", cx-30, 40);
+        ctx.beginPath(); ctx.moveTo(cx, 45); ctx.lineTo(cx, 60); ctx.stroke();
+
+        // Координаты (Низ)
+        ctx.font = "9px monospace";
+        ctx.fillText(`LAT: ${data.lat.toFixed(4)} LON: ${data.lon.toFixed(4)}`, 20, h-20);
+
+        requestAnimationFrame(loop);
     }
 </script>
 </body>
