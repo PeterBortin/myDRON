@@ -3,200 +3,256 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FPV Advanced HUD</title>
+    <title>Retro Tactical HUD</title>
     <style>
-        :root { --hud-color: #00ff00; --alert-color: #ff0000; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
-        
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
-        video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.3; filter: grayscale(1) contrast(1.5); z-index: 1; }
-
-        .ui-panel {
-            position: fixed; bottom: 30px; width: 100%; display: flex;
-            justify-content: center; gap: 20px; z-index: 100;
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
         }
 
-        .btn {
-            background: rgba(0, 40, 0, 0.6); color: var(--hud-color);
-            border: 1px solid var(--hud-color); padding: 15px 25px;
-            text-transform: uppercase; font-size: 12px; font-weight: bold;
-            letter-spacing: 2px; cursor: pointer; backdrop-filter: blur(5px);
+        /* Слой камеры под канвасом */
+        #camVideo {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            filter: grayscale(1) brightness(0.6) contrast(1.2) sepia(0.2) hue-rotate(80deg);
+            display: none;
         }
 
-        #terminal {
-            position: fixed; top: 20px; left: 20px; width: 250px; height: 150px;
-            background: rgba(0, 20, 0, 0.8); border: 1px solid var(--hud-color);
-            color: var(--hud-color); font-size: 10px; padding: 10px;
-            overflow: hidden; z-index: 90; display: none;
+        /* Эффект ЭЛТ-монитора */
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+            z-index: 10;
         }
 
-        #overlay {
-            position: fixed; inset: 0; background: #000; z-index: 1000;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            color: var(--hud-color); text-align: center;
+        #hudCanvas {
+            position: relative;
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            z-index: 5;
+            filter: brightness(1.2) contrast(1.1) drop-shadow(0 0 2px #0f0);
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: rgba(0, 0, 0, 0.6);
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 10px 15px;
+            text-transform: uppercase;
+            font-size: 11px;
+            cursor: pointer;
+            backdrop-filter: blur(2px);
         }
     </style>
 </head>
 <body>
+    <video id="camVideo" autoplay playsinline></video>
+    <div class="crt-overlay"></div>
+    <canvas id="hudCanvas"></canvas>
 
-<div id="overlay">
-    <h1 style="letter-spacing: 10px;">FPV SYSTEM v2.0</h1>
-    <p>WAITING FOR NEURAL LINK...</p>
-    <button class="btn" onclick="bootSystem()">CONNECT SENSORS</button>
-</div>
+    <div class="controls">
+        <button onclick="initSensors()">Init Sensors</button>
+        <button onclick="toggleAlert()">Alert</button>
+        <button onclick="resetSim()">Reset</button>
+    </div>
 
-<video id="cam" autoplay playsinline></video>
-<canvas id="hud"></canvas>
-<div id="terminal"></div>
+    <script>
+        const canvas = document.getElementById('hudCanvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('camVideo');
 
-<div class="ui-panel">
-    <button class="btn" onclick="toggleTerminal()">Data</button>
-    <button class="btn" onclick="toggleAlert()">Combat</button>
-</div>
+        let width, height;
+        let frame = 0;
+        let pitch = 0;
+        let roll = 0;
+        let speed = 126;
+        let altitude = 7820;
+        let alertMode = false;
+        let sensorsActive = false;
 
-<script>
-    const canvas = document.getElementById('hud');
-    const ctx = canvas.getContext('2d');
-    const video = document.getElementById('cam');
-    const term = document.getElementById('terminal');
-
-    let w, h;
-    let roll = 0, pitch = 0, yaw = 0;
-    let speed = 0, alt = 150;
-    let isAlert = false;
-    let frame = 0;
-
-    function resize() {
-        w = canvas.width = window.innerWidth;
-        h = canvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resize);
-    resize();
-
-    function log(msg) {
-        const line = document.createElement('div');
-        line.textContent = `> ${msg}`;
-        term.prepend(line);
-    }
-
-    async function bootSystem() {
-        document.getElementById('overlay').style.display = 'none';
-        
-        // Камера
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-            video.srcObject = stream;
-            log("CAM LINK ESTABLISHED");
-        } catch(e) { log("CAM ERROR: " + e.message); }
-
-        // Датчики
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            const res = await DeviceOrientationEvent.requestPermission();
-            if (res === 'granted') window.addEventListener('deviceorientation', updateSensors);
-        } else {
-            window.addEventListener('deviceorientation', updateSensors);
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
         }
-        log("GYRO STABILIZED");
-        requestAnimationFrame(loop);
-    }
 
-    function updateSensors(e) {
-        // Оптимизация под альбомную ориентацию
-        if (window.innerHeight < window.innerWidth) {
-            roll = e.beta;
-            pitch = -e.gamma - 30;
-        } else {
-            roll = e.gamma;
-            pitch = e.beta - 60;
-        }
-    }
+        window.addEventListener('resize', resize);
+        resize();
 
-    function drawCrosshair() {
-        ctx.save();
-        ctx.translate(w/2, h/2);
-        
-        const gap = 20 + Math.abs(roll * 0.5); // Динамический зазор
-        ctx.strokeStyle = isAlert ? '#ff0000' : '#00ff00';
-        ctx.lineWidth = 2;
+        // Запрос камеры и гироскопа
+        async function initSensors() {
+            // Камера
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                video.style.display = 'block';
+            } catch (err) { console.warn("Camera access denied"); }
 
-        // Центральные скобки (из твоего рефа)
-        ctx.beginPath();
-        // Левая скобка
-        ctx.moveTo(-gap - 20, -15); ctx.lineTo(-gap, -15);
-        ctx.moveTo(-gap - 20, 15); ctx.lineTo(-gap, 15);
-        ctx.moveTo(-gap - 20, -15); ctx.lineTo(-gap - 20, 15);
-        
-        // Правая скобка
-        ctx.moveTo(gap + 20, -15); ctx.lineTo(gap, -15);
-        ctx.moveTo(gap + 20, 15); ctx.lineTo(gap, 15);
-        ctx.moveTo(gap + 20, -15); ctx.lineTo(gap + 20, 15);
-        
-        // Центр
-        ctx.moveTo(-10, 0); ctx.lineTo(-5, 0);
-        ctx.moveTo(10, 0); ctx.lineTo(5, 0);
-        ctx.stroke();
-        ctx.restore();
-    }
-
-    function drawTapes() {
-        ctx.font = '14px monospace';
-        ctx.fillStyle = isAlert ? '#ff0000' : '#00ff00';
-        
-        // Скорость (лево)
-        let sVal = 45 + Math.sin(frame * 0.01) * 5;
-        ctx.strokeRect(40, h/2 - 100, 50, 200);
-        ctx.fillText("SPD", 40, h/2 - 110);
-        ctx.fillText(Math.round(sVal), 50, h/2);
-
-        // Высота (право)
-        ctx.strokeRect(w - 90, h/2 - 100, 50, 200);
-        ctx.fillText("ALT", w - 90, h/2 - 110);
-        ctx.fillText(Math.round(alt - pitch), w - 80, h/2);
-    }
-
-    function drawHorizon() {
-        ctx.save();
-        ctx.translate(w/2, h/2);
-        ctx.rotate(roll * Math.PI / 180);
-        ctx.translate(0, pitch * 5);
-
-        ctx.strokeStyle = isAlert ? 'rgba(255,0,0,0.5)' : 'rgba(0,255,0,0.5)';
-        ctx.beginPath();
-        for(let i = -10; i <= 10; i++) {
-            if(i === 0) {
-                ctx.moveTo(-150, 0); ctx.lineTo(150, 0);
+            // Гироскоп (с обработкой разрешений для iOS)
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                const permission = await DeviceOrientationEvent.requestPermission();
+                if (permission === 'granted') {
+                    window.addEventListener('deviceorientation', handleMotion);
+                    sensorsActive = true;
+                }
             } else {
-                let y = i * 40;
-                ctx.moveTo(-30, y); ctx.lineTo(30, y);
-                ctx.fillText(i * 10, 40, y + 5);
+                window.addEventListener('deviceorientation', handleMotion);
+                sensorsActive = true;
             }
         }
-        ctx.stroke();
-        ctx.restore();
-    }
 
-    function loop() {
-        frame++;
-        ctx.clearRect(0, 0, w, h);
-
-        // Эффект помех
-        if (Math.random() > 0.98) {
-            ctx.fillStyle = 'rgba(0,255,0,0.1)';
-            ctx.fillRect(0, Math.random() * h, w, 2);
+        function handleMotion(e) {
+            // Адаптация под горизонтальный/вертикальный наклон
+            roll = e.gamma; 
+            pitch = e.beta - 45; // Смещение для удобного угла обзора
         }
 
-        drawHorizon();
-        drawCrosshair();
-        drawTapes();
+        // Симуляция данных (если сенсоры не активны)
+        function updateData() {
+            frame++;
+            if (!sensorsActive) {
+                pitch = Math.sin(frame * 0.01) * 10;
+                roll = Math.cos(frame * 0.02) * 5;
+            }
+            speed += (Math.random() - 0.5) * 0.5;
+            altitude += (Math.random() - 0.4) * 2;
+        }
 
-        // Статус бар
-        ctx.fillText(`VOLT: 14.8V  RSSI: 99%  SAT: 12`, 20, h - 20);
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(0, 50, 0, 0.3)';
+            ctx.lineWidth = 1;
+            for(let i = 0; i < width; i += 40) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
+            }
+            for(let i = 0; i < height; i += 40) {
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke();
+            }
+        }
 
-        requestAnimationFrame(loop);
-    }
+        function drawTape(x, y, val, alignRight = false) {
+            const h = 200;
+            const w = 50;
+            ctx.strokeStyle = '#0f0';
+            ctx.fillStyle = '#0f0';
+            ctx.strokeRect(x, y - h/2, w, h);
+            
+            ctx.save();
+            ctx.rect(x, y - h/2, w, h);
+            ctx.clip();
+            
+            const offset = (val % 20);
+            for(let i = -6; i <= 6; i++) {
+                let currVal = Math.floor(val/20)*20 + (i * 20);
+                let ty = y - (i * 40) + (val % 20) * 2;
+                ctx.beginPath();
+                ctx.moveTo(alignRight ? x : x + w, ty);
+                ctx.lineTo(alignRight ? x + 10 : x + w - 10, ty);
+                ctx.stroke();
+                ctx.fillText(currVal, alignRight ? x + 15 : x + 5, ty + 5);
+            }
+            ctx.restore();
+            
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
+            ctx.fillRect(x - 5, y - 15, w + 10, 30);
+            ctx.fillStyle = '#0f0';
+            ctx.font = 'bold 14px monospace';
+            ctx.fillText(Math.round(val), x + 10, y + 5);
+        }
 
-    function toggleTerminal() { term.style.display = term.style.display === 'block' ? 'none' : 'block'; }
-    function toggleAlert() { isAlert = !isAlert; log(isAlert ? "WEAPON ACTIVE" : "SCAN MODE"); }
-</script>
+        function drawHorizon() {
+            ctx.save();
+            ctx.translate(width / 2, height / 2);
+            ctx.rotate(roll * Math.PI / 180);
+            ctx.translate(0, pitch * 5);
+
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 2;
+
+            ctx.beginPath();
+            ctx.moveTo(-20, 0); ctx.lineTo(-10, 0); ctx.lineTo(-10, 5);
+            ctx.moveTo(20, 0); ctx.lineTo(10, 0); ctx.lineTo(10, 5);
+            ctx.stroke();
+
+            for(let i = -2; i <= 2; i++) {
+                if(i === 0) continue;
+                let ty = i * 40;
+                ctx.beginPath();
+                ctx.moveTo(-30, ty); ctx.lineTo(30, ty);
+                ctx.stroke();
+                ctx.font = '10px monospace';
+                ctx.fillText(i * 10, 35, ty + 4);
+            }
+            ctx.restore();
+        }
+
+        function drawTerminalInfo() {
+            ctx.fillStyle = '#0f0';
+            ctx.font = '12px monospace';
+            const now = new Date();
+            ctx.fillText(now.toLocaleTimeString() + " | SENSOR LINK", 20, 30);
+            ctx.fillText(sensorsActive ? "//GYRO.STABLE" : "//EMULATION.MODE", 20, 50);
+            
+            for(let i = 0; i < 3; i++) {
+                let barH = 40 + Math.sin(frame * 0.05 + i) * 20;
+                ctx.globalAlpha = 0.5;
+                ctx.fillRect(width - 120 + (i * 30), 50, 20, barH);
+                ctx.globalAlpha = 1.0;
+                ctx.strokeRect(width - 120 + (i * 30), 50, 20, barH);
+            }
+        }
+
+        function render() {
+            // Очищаем прозрачным, чтобы видеть видео
+            ctx.clearRect(0, 0, width, height);
+
+            if(alertMode && frame % 30 < 15) {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
+                ctx.fillRect(0, 0, width, height);
+            }
+
+            drawGrid();
+            updateData();
+            drawHorizon();
+            
+            drawTape(width * 0.15, height / 2, speed);
+            drawTape(width * 0.75, height / 2, altitude, true);
+            
+            drawTerminalInfo();
+
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
+            ctx.fillRect(0, (frame * 2) % height, width, 2);
+
+            requestAnimationFrame(render);
+        }
+
+        function toggleAlert() { alertMode = !alertMode; }
+        function resetSim() { speed = 126; altitude = 7820; pitch = 0; roll = 0; }
+
+        render();
+    </script>
 </body>
 </html>
