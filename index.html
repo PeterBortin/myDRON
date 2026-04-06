@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DRONE PFD v8.2 — КРЕН / ТАНГАЖ / КУРС ПРОВЕРЕНО</title>
+    <title>DRONE PFD v8.2 — FIXED</title>
     <style>
         :root { --color: #00ff41; }
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
         body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: var(--color); }
         
         #cam { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; 
-               filter: brightness(0.65) contrast(1.45) sepia(0.25) hue-rotate(88deg); }
+               filter: brightness(0.6) contrast(1.4) sepia(0.2) hue-rotate(88deg); }
         
         #canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
         
@@ -54,9 +54,9 @@
 <div id="boot" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:300;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;">
     <div style="background:#000;border:2px solid #0f0;padding:40px 30px;text-align:center;max-width:92%;">
         <h1 style="font-size:26px;letter-spacing:4px;margin-bottom:10px;">DRONE PFD v8.2</h1>
-        <p style="margin-bottom:20px;font-size:14px;">ПРОВЕРЕНО: крен • тангаж • курс • стабилизация</p>
-        <p style="font-size:12px;margin-bottom:25px;">Установите телефон строго параллельно корпусу дрона (ровно!)</p>
-        <button onclick="boot()" style="background:#0f0;color:#000;border:none;padding:18px 60px;font-weight:bold;font-size:17px;cursor:pointer;">ЗАПУСТИТЬ И ПРОВЕРИТЬ</button>
+        <p style="margin-bottom:20px;font-size:14px;">ЛЕВЫЙ: КРЕН | ПРАВЫЙ: ВЫСОТА</p>
+        <p style="font-size:12px;margin-bottom:25px;">Установите телефон ровно относительно дрона</p>
+        <button onclick="boot()" style="background:#0f0;color:#000;border:none;padding:18px 60px;font-weight:bold;font-size:17px;cursor:pointer;">ЗАПУСТИТЬ</button>
     </div>
 </div>
 
@@ -80,14 +80,10 @@
 
     async function requestSensors() {
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            try {
-                await DeviceOrientationEvent.requestPermission();
-            } catch(e){}
+            try { await DeviceOrientationEvent.requestPermission(); } catch(e){}
         }
         if (typeof DeviceMotionEvent.requestPermission === 'function') {
-            try {
-                await DeviceMotionEvent.requestPermission();
-            } catch(e){}
+            try { await DeviceMotionEvent.requestPermission(); } catch(e){}
         }
     }
 
@@ -101,12 +97,11 @@
 
         requestSensors().then(() => {
             window.addEventListener('deviceorientation', handleOrientation, { passive: true });
-            window.addEventListener('devicemotion', handleMotion, { passive: true });
         });
 
         state.active = true;
         animate();
-        setInterval(updateDebugAndStatus, 80); // очень частое обновление для проверки
+        setInterval(updateDebugAndStatus, 100);
     }
 
     function handleOrientation(e) {
@@ -114,162 +109,76 @@
         state.gyroActive = true;
         info.style.display = 'none';
 
-        state.rawPitch = e.beta !== null ? e.beta : state.rawPitch;
-        state.rawRoll  = e.gamma !== null ? e.gamma : state.rawRoll;
+        // Стабилизированные сырые данные
+        state.rawPitch = e.beta || 0;
+        state.rawRoll  = e.gamma || 0;
         
-        // Надёжный курс (iPhone)
-        if (e.webkitCompassHeading !== null && e.webkitCompassHeading !== undefined) {
+        if (e.webkitCompassHeading !== undefined) {
             state.rawHeading = e.webkitCompassHeading;
-        } else if (e.alpha !== null) {
-            state.rawHeading = e.alpha;
+        } else {
+            state.rawHeading = e.alpha || 0;
         }
         
         state.lastUpdate = Date.now();
     }
 
-    function handleMotion(e) {
-        if (!e || !e.rotationRate) return;
-        state.gyroActive = true;
-        info.style.display = 'none';
-
-        const r = e.rotationRate;
-        if (r.beta !== null)  state.rawPitch = state.rawPitch * 0.6 + r.beta * 0.4;
-        if (r.gamma !== null) state.rawRoll  = state.rawRoll  * 0.6 + r.gamma * 0.4;
-    }
-
     function resetHorizon() {
         state.offsetPitch = state.rawPitch;
         state.offsetRoll  = state.rawRoll;
-        if (navigator.vibrate) navigator.vibrate([40, 20, 40]);
+        if (navigator.vibrate) navigator.vibrate(50);
     }
 
     function updateDebugAndStatus() {
-        const timeSince = Date.now() - state.lastUpdate;
-        const isLive = timeSince < 800;
-
+        const isLive = (Date.now() - state.lastUpdate) < 1000;
         debugPanel.innerHTML = `
-            <b>СЫРЫЕ ДАННЫЕ (датчики)</b><br>
-            ТАНГАЖ (pitch) raw: <span style="color:#0f0">${state.rawPitch.toFixed(1)}°</span><br>
-            КРЕН (roll) raw: <span style="color:#0f0">${state.rawRoll.toFixed(1)}°</span><br>
-            КУРС raw: <span style="color:#0f0">${state.rawHeading.toFixed(0)}°</span><br><br>
-            
-            <b>ПОСЛЕ СГЛАЖИВАНИЯ</b><br>
-            ТАНГАЖ: <span style="color:#0f0">${state.pitch.toFixed(1)}°</span><br>
-            КРЕН: <span style="color:#0f0">${state.roll.toFixed(1)}°</span><br>
-            КУРС: <span style="color:#0f0">${state.heading.toFixed(0)}°</span><br><br>
-            
-            <span style="color:${isLive ? '#0f0' : '#f00'}">
-                ${isLive ? '✅ ДАТЧИКИ ЖИВЫЕ' : '⚠️ ДАННЫЕ УСТАРЕЛИ'}
-            </span>
+            <b>SYSTEM DATA</b><br>
+            ROLL (L-TAPE): <span style="color:#0f0">${state.roll.toFixed(1)}°</span><br>
+            PITCH (CENTER): <span style="color:#0f0">${state.pitch.toFixed(1)}°</span><br>
+            HEADING: <span style="color:#0f0">${state.heading.toFixed(0)}°</span><br><br>
+            <span style="color:${isLive ? '#0f0' : '#f00'}">${isLive ? 'SENSORS OK' : 'SENSOR ERROR'}</span>
         `;
-
-        statusBar.innerHTML = `ГИРО ${state.gyroActive ? '✅ АКТИВЕН' : '⚠️ НЕТ'} &nbsp;&nbsp; HDG ${Math.round(state.heading)}°`;
+        statusBar.innerHTML = `SYS: ACTIVE | GYRO: ${state.gyroActive ? 'OK' : 'ERR'}`;
     }
 
     function drawHorizon() {
         const w = canvas.width, h = canvas.height;
         const cx = w/2, cy = h/2;
 
-        // Улучшенное сглаживание (очень стабильное, но отзывчивое)
-        state.pitch = state.pitch * 0.82 + ((state.rawPitch - state.offsetPitch) * 0.18);
-        state.roll  = state.roll  * 0.82 + ((state.rawRoll  - state.offsetRoll)  * 0.18);
+        // Плавная фильтрация для предотвращения "сальто" и рывков
+        state.pitch = state.pitch * 0.85 + ((state.rawPitch - state.offsetPitch) * 0.15);
+        state.roll  = state.roll  * 0.85 + ((state.rawRoll  - state.offsetRoll)  * 0.15);
         state.heading = state.rawHeading;
-
-        // Ограничение ±90° (защита от скачков)
-        state.pitch = Math.max(Math.min(state.pitch, 90), -90);
-        state.roll  = Math.max(Math.min(state.roll, 90), -90);
 
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(state.roll * Math.PI / 180);
 
-        const pitchY = state.pitch * 8.8; // чувствительность 1° = 8.8 px
+        const pitchY = state.pitch * 8; 
 
         ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 4;
-        ctx.shadowBlur = 18;
-        ctx.shadowColor = '#0f0';
-
-        // Основная линия горизонта
-        ctx.beginPath();
-        ctx.moveTo(-400, pitchY);
-        ctx.lineTo(400, pitchY);
-        ctx.stroke();
-
-        // Шкала тангажа (каждые 5°)
-        ctx.lineWidth = 2.2;
-        ctx.font = 'bold 13px monospace';
-        ctx.textAlign = 'center';
-
-        for (let i = -70; i <= 70; i += 5) {
-            if (i === 0) continue;
-            const y = pitchY - i * 8.8;
-            if (Math.abs(y) > h * 0.65) continue;
-
-            ctx.setLineDash(i % 10 === 0 ? [] : [5, 3]);
-            ctx.beginPath();
-            ctx.moveTo(-65, y);
-            ctx.lineTo(65, y);
-            ctx.stroke();
-
-            if (i % 10 === 0) {
-                ctx.fillStyle = '#0f0';
-                ctx.fillText(i.toString(), 88, y + 5);
-                ctx.fillText(i.toString(), -88, y + 5);
-            }
-        }
-        ctx.setLineDash([]);
-        ctx.restore();
-    }
-
-    function drawRollIndicator() {
-        const cx = canvas.width / 2;
-        const cy = canvas.height / 2 - 25;
-        const r = 142;
-
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 3.5;
+        ctx.lineWidth = 3;
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#0f0';
 
-        // Фиксированная дуга крена
+        // Линия горизонта
         ctx.beginPath();
-        ctx.arc(0, 0, r, -1.1 * Math.PI, -0.1 * Math.PI); // -60° … +60°
+        ctx.moveTo(-w, pitchY);
+        ctx.lineTo(w, pitchY);
         ctx.stroke();
 
-        const marks = [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60];
-        ctx.font = 'bold 14px monospace';
-
-        for (let ang of marks) {
-            const rad = (ang * Math.PI / 180) - Math.PI / 2;
-            const x1 = Math.cos(rad) * r;
-            const y1 = Math.sin(rad) * r;
-            const extra = Math.abs(ang) % 30 === 0 ? 29 : 17;
-            const x2 = Math.cos(rad) * (r + extra);
-            const y2 = Math.sin(rad) * (r + extra);
-
+        // Шкала тангажа в центре
+        ctx.lineWidth = 2;
+        ctx.textAlign = 'center';
+        for (let i = -60; i <= 60; i += 10) {
+            if (i === 0) continue;
+            const y = pitchY - i * 8;
             ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
+            ctx.moveTo(-50, y);
+            ctx.lineTo(50, y);
             ctx.stroke();
-
-            if (Math.abs(ang) % 30 === 0 || ang === 0) {
-                ctx.fillText(Math.abs(ang).toString(), Math.cos(rad) * (r + 44), Math.sin(rad) * (r + 44) + 6);
-            }
+            ctx.fillText(Math.abs(i), 70, y + 5);
+            ctx.fillText(Math.abs(i), -70, y + 5);
         }
-
-        // Указатель крена (вращается)
-        ctx.rotate(state.roll * Math.PI / 180);
-        ctx.fillStyle = '#0f0';
-        ctx.shadowBlur = 25;
-        ctx.beginPath();
-        ctx.moveTo(0, -r - 22);
-        ctx.lineTo(-16, -r + 12);
-        ctx.lineTo(16, -r + 12);
-        ctx.closePath();
-        ctx.fill();
         ctx.restore();
     }
 
@@ -277,72 +186,69 @@
         ctx.save();
         ctx.translate(x, y);
         ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 2.5;
-        ctx.strokeRect(side === 'L' ? -48 : 0, -138, 48, 276);
+        ctx.lineWidth = 2;
+        ctx.strokeRect(side === 'L' ? -50 : 0, -140, 50, 280);
 
-        const start = Math.floor(value / 10) * 10 - 45;
-        for (let i = start; i <= start + 100; i += 10) {
-            const pos = (value - i) * 7.2;
-            ctx.beginPath();
-            ctx.moveTo(side === 'L' ? -18 : 0, pos);
-            ctx.lineTo(side === 'L' ? 0 : 18, pos);
-            ctx.stroke();
-            ctx.font = '11px monospace';
-            ctx.fillText(i, side === 'L' ? -36 : 25, pos + 4);
-        }
-        ctx.restore();
-
+        // Масштаб: 1 единица = 5 пикселей
+        const start = Math.floor(value / 10) * 10 - 30;
+        ctx.font = '12px monospace';
         ctx.fillStyle = '#0f0';
-        ctx.font = 'bold 24px monospace';
+        
+        for (let i = start; i <= start + 60; i += 10) {
+            const pos = (value - i) * 6;
+            if (Math.abs(pos) > 130) continue;
+            ctx.beginPath();
+            ctx.moveTo(side === 'L' ? -15 : 0, pos);
+            ctx.lineTo(side === 'L' ? 0 : 15, pos);
+            ctx.stroke();
+            ctx.fillText(i, side === 'L' ? -35 : 25, pos + 4);
+        }
+        
+        // Цифровое табло в центре барабана
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.fillRect(side === 'L' ? -55 : -5, -20, 60, 40);
+        ctx.strokeStyle = '#0f0';
+        ctx.strokeRect(side === 'L' ? -55 : -5, -20, 60, 40);
+        ctx.fillStyle = '#0f0';
+        ctx.font = 'bold 18px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(Math.round(value), side === 'L' ? x - 30 : x + 28, y + 12);
-
-        ctx.font = '9px monospace';
-        ctx.fillText(label + ' ' + unit, side === 'L' ? x - 30 : x + 28, y - 152);
+        ctx.fillText(Math.round(value), side === 'L' ? -25 : 25, 7);
+        
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText(label, side === 'L' ? -25 : 25, -150);
+        ctx.restore();
     }
 
     function animate() {
         if (!state.active) return;
         state.frame++;
-
         const w = canvas.width = window.innerWidth;
         const h = canvas.height = window.innerHeight;
-        ctx.clearRect(0, 0, w, h);
-
+        
         drawHorizon();
-        drawRollIndicator();
 
-        // Демо-значения (реальные GPS можно добавить позже)
-        const demoSpeed = 38 + Math.sin(state.frame / 70) * 12;
-        const demoAlt   = 1480 + Math.cos(state.frame / 110) * 180;
-
-        drawTape(130, h/2, demoSpeed, "GS", "L", "KT");
-        drawTape(w - 130, h/2, demoAlt, "ALT", "R", "FT");
+        // ЛЕВЫЙ БАРАБАН: КРЕН (Roll)
+        drawTape(120, h/2, state.roll, "ROLL", "L", "°");
+        
+        // ПРАВЫЙ БАРАБАН: ВЫСОТА (Alt - демо)
+        const demoAlt = 150 + Math.sin(state.frame/50)*10;
+        drawTape(w - 120, h/2, demoAlt, "ALT", "R", "FT");
 
         // Прицел
         ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 3;
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = '#0f0';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(w/2, h/2, 18, 0, Math.PI * 2);
-        ctx.moveTo(w/2 - 42, h/2); ctx.lineTo(w/2 - 18, h/2);
-        ctx.moveTo(w/2 + 42, h/2); ctx.lineTo(w/2 + 18, h/2);
-        ctx.moveTo(w/2, h/2 - 42); ctx.lineTo(w/2, h/2 - 18);
-        ctx.moveTo(w/2, h/2 + 42); ctx.lineTo(w/2, h/2 + 18);
+        ctx.arc(w/2, h/2, 20, 0, Math.PI*2);
+        ctx.moveTo(w/2-40, h/2); ctx.lineTo(w/2-20, h/2);
+        ctx.moveTo(w/2+40, h/2); ctx.lineTo(w/2+20, h/2);
         ctx.stroke();
 
-        ctx.font = 'bold 21px monospace';
+        ctx.font = 'bold 20px monospace';
         ctx.textAlign = 'center';
-        ctx.shadowBlur = 12;
-        ctx.fillText(`HDG ${Math.round(state.heading).toString().padStart(3, '0')}°`, w/2, 78);
+        ctx.fillText(`HDG ${Math.round(state.heading)}°`, w/2, 80);
 
         requestAnimationFrame(animate);
     }
-
-    window.addEventListener('load', () => {
-        console.log('%cDRONE PFD v8.2 — КРЕН, ТАНГАЖ, КУРС И СТАБИЛИЗАЦИЯ ПРОВЕРЕНЫ И ИСПРАВЛЕНЫ', 'color:#0f0;font-size:13px');
-    });
 </script>
 </body>
 </html>
