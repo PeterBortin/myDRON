@@ -3,28 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FPV HUD V9.0 | HORIZON FIXED</title>
+    <title>FPV COMMAND CENTER v7.0</title>
     <style>
-        :root { --green: #00ff41; --shadow: rgba(0, 255, 65, 0.2); }
-        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; touch-action: none; }
-        body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: var(--green); }
+        :root { --color: #00ff41; --bg: rgba(0, 50, 0, 0.2); }
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
         
         #cam { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; 
-               filter: brightness(0.6) contrast(1.3) sepia(0.2) hue-rotate(85deg); }
+               filter: brightness(0.6) contrast(1.4) sepia(0.3) hue-rotate(85deg); }
         
         #canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
         
-        #ui-boot { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100;
-                   background: #000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100;
+                   background: radial-gradient(circle, transparent 20%, #000 150%);
+                   display: flex; flex-direction: column; justify-content: center; align-items: center; }
         
-        .terminal-box { border: 1px solid var(--green); padding: 25px; background: rgba(0,20,0,0.9); box-shadow: 0 0 15px var(--shadow); }
+        .terminal { background: #000; border: 1px solid var(--color); padding: 30px; box-shadow: 0 0 20px var(--color); color: var(--color); text-align: center; }
         
-        .btn-link { background: var(--green); color: #000; border: none; padding: 15px 45px; 
-                    font-weight: bold; cursor: pointer; font-family: inherit; margin-top: 15px; }
-        
+        .btn { background: var(--color); color: #000; border: none; padding: 15px 40px; font-weight: bold; 
+               font-family: inherit; cursor: pointer; margin-top: 20px; letter-spacing: 2px; }
+
+        /* Кнопка сброса горизонтали */
+        #reset-btn {
+            position: fixed; bottom: 20px; right: 20px; z-index: 50;
+            background: rgba(0,0,0,0.6); border: 1px solid var(--color); color: var(--color);
+            padding: 10px; font-size: 10px; cursor: pointer; display: none;
+        }
+
         .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 15;
-                     background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 255, 0, 0.02) 50%);
-                     background-size: 100% 2px; pointer-events: none; }
+                     background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 255, 0, 0.05) 50%), 
+                                 linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+                     background-size: 100% 4px, 3px 100%; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -33,11 +42,13 @@
 <div class="scanlines"></div>
 <canvas id="canvas"></canvas>
 
-<div id="ui-boot">
-    <div class="terminal-box">
-        <h2 id="msg">TERMINAL V9.0 READY</h2>
-        <p style="font-size: 10px; margin: 10px 0;">[SYSTEM::ORIENTATION_FIX_ACTIVE]</p>
-        <button class="btn-link" onclick="start()">CONNECT LINK</button>
+<button id="reset-btn" onclick="resetHorizon()">RESET HORIZON</button>
+
+<div id="boot" class="overlay">
+    <div class="terminal">
+        <h1 style="font-size: 18px;">[ SYSTEM INITIALIZATION ]</h1>
+        <p style="font-size: 10px; margin: 10px 0;">SENSORS: STANDBY | LINK: DISCONNECTED</p>
+        <button class="btn" onclick="boot()">ENGAGE SYSTEM</button>
     </div>
 </div>
 
@@ -48,99 +59,57 @@
     
     let state = { 
         p: 0, r: 0, h: 0, 
-        smoothP: 0, smoothR: 0,
-        alt: 1250, spd: 88, active: false 
+        offsetP: 0, offsetR: 0, // Для калибровки
+        s: 142, a: 850, batt: 24.4, active: false, frame: 0 
     };
 
-    function start() {
-        // Камера
+    function boot() {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
             .then(s => { video.srcObject = s; video.play(); })
-            .catch(e => alert("NO CAM"));
+            .catch(e => alert("CAM ERR: " + e));
 
-        // Датчики (iOS 13+ Force)
-        if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            DeviceOrientationEvent.requestPermission().then(response => {
-                if (response === 'granted') window.addEventListener('deviceorientation', updateSensors);
-            });
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+                .then(res => { if(res === 'granted') window.addEventListener('deviceorientation', handleGyro); })
+                .catch(e => alert("GYRO ERR: " + e));
         } else {
-            window.addEventListener('deviceorientation', updateSensors);
+            window.addEventListener('deviceorientation', handleGyro);
         }
 
-        document.getElementById('ui-boot').style.display = 'none';
+        document.getElementById('boot').style.display = 'none';
+        document.getElementById('reset-btn').style.display = 'block';
         state.active = true;
-        render();
+        animate();
     }
 
-    function updateSensors(e) {
-        // iOS берет beta для pitch и gamma для roll
-        state.p = e.beta; 
-        state.r = e.gamma;
+    function handleGyro(e) {
+        // На iOS beta (pitch) идет от -180 до 180, gamma (roll) от -90 до 90
+        // Применяем калибровку
+        state.p = e.beta - state.offsetP;
+        state.r = e.gamma - state.offsetR;
         state.h = e.webkitCompassHeading || e.alpha || 0;
     }
 
-    function drawHorizon() {
-        const w = canvas.width, h = canvas.height;
-        const cx = w / 2, cy = h / 2;
-
-        // Сглаживание (LERP) для устранения тряски
-        state.smoothP += (state.p - state.smoothP) * 0.15;
-        state.smoothR += (state.r - state.smoothR) * 0.15;
-
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(state.smoothR * Math.PI / 180);
-
-        // Расчет вертикального смещения: 12 пикселей на 1 градус тангажа
-        const pitchSpacing = 12;
-        let pitchY = state.smoothP * pitchSpacing;
-
-        // Рисуем область земли (заполнение ниже горизонта)
-        ctx.fillStyle = "rgba(0, 255, 0, 0.1)";
-        ctx.beginPath();
-        ctx.moveTo(-w*2, pitchY);
-        ctx.lineTo(w*2, pitchY);
-        ctx.lineTo(w*2, h*2);
-        ctx.lineTo(-w*2, h*2);
-        ctx.fill();
-
-        // Главная линия горизонта
-        ctx.strokeStyle = varColor('--green');
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(-250, pitchY); ctx.lineTo(-60, pitchY);
-        ctx.moveTo(60, pitchY); ctx.lineTo(250, pitchY);
-        ctx.stroke();
-
-        // Штрихи тангажа (лестница)
-        ctx.lineWidth = 1;
-        ctx.font = "10px monospace";
-        for (let i = -90; i <= 90; i += 10) {
-            if (i === 0) continue;
-            let y = pitchY - (i * pitchSpacing);
-            let lineW = (Math.abs(i) % 20 === 0) ? 60 : 30;
-            
-            ctx.globalAlpha = Math.max(0, 1 - Math.abs(state.smoothP - i) / 40);
-            ctx.beginPath();
-            ctx.moveTo(-lineW, y); ctx.lineTo(lineW, y);
-            ctx.stroke();
-            ctx.fillText(i, lineW + 5, y + 4);
-            ctx.fillText(i, -lineW - 20, y + 4);
-        }
-        ctx.restore();
-        ctx.globalAlpha = 1;
+    function resetHorizon() {
+        // Запоминаем текущее положение как "0"
+        // Нам нужно вычесть текущее смещение, чтобы горизонт встал в центр
+        // Но так как beta обычно ~90 когда телефон вертикально, мы калибруем под текущий хват
+        state.offsetP = state.p + state.offsetP;
+        state.offsetR = state.r + state.offsetR;
     }
 
-    function drawTape(x, y, val, label, side) {
+    function drawTape(x, y, value, label, side) {
         ctx.save();
         ctx.translate(x, y);
-        ctx.strokeStyle = varColor('--green');
+        ctx.strokeStyle = '#0f0';
+        ctx.lineWidth = 2;
+        
         ctx.strokeRect(side === 'L' ? -40 : 0, -150, 40, 300);
         ctx.clip(new Path2D(`M ${side === 'L' ? -40 : 0} -150 h 40 v 300 h -40 Z`));
-        
-        let start = Math.floor(val / 10) * 10 - 40;
-        for (let i = start; i <= start + 80; i += 10) {
-            let yPos = (val - i) * 6;
+
+        let start = Math.floor(value / 10) * 10 - 50;
+        for (let i = start; i <= start + 100; i += 10) {
+            let yPos = (value - i) * 6;
             ctx.beginPath();
             ctx.moveTo(side === 'L' ? -10 : 0, yPos);
             ctx.lineTo(side === 'L' ? 0 : 10, yPos);
@@ -148,46 +117,109 @@
             ctx.font = "10px monospace";
             ctx.fillText(i, side === 'L' ? -35 : 15, yPos + 4);
         }
-        ctx.restore();
         
-        // Плашка текущего значения
-        ctx.fillStyle = "rgba(0,40,0,0.9)";
-        ctx.fillRect(side === 'L' ? x-45 : x-5, y-15, 55, 30);
-        ctx.fillStyle = "#fff";
+        ctx.restore();
+        ctx.fillStyle = "rgba(0,255,0,0.2)";
+        ctx.fillRect(side === 'L' ? x-45 : x-5, y-15, 50, 30);
+        ctx.fillStyle = "#0f0";
         ctx.font = "bold 14px monospace";
-        ctx.fillText(Math.round(val), side === 'L' ? x-38 : x+8, y+6);
-        ctx.fillStyle = varColor('--green');
-        ctx.fillText(label, side === 'L' ? x-38 : x+5, y-160);
+        ctx.fillText(Math.round(value), side === 'L' ? x-35 : x+5, y+5);
+        ctx.font = "10px monospace";
+        ctx.fillText(label, side === 'L' ? x-35 : x+5, y-160);
     }
 
-    function varColor(name) { return getComputedStyle(document.documentElement).getPropertyValue(name); }
-
-    function render() {
-        const w = canvas.width = window.innerWidth;
-        const h = canvas.height = window.innerHeight;
-        ctx.clearRect(0, 0, w, h);
-
-        if (!state.active) return;
-
-        drawHorizon();
-        drawTape(w/2 - 180, h/2, state.spd, "SPD", "L");
-        drawTape(w/2 + 180, h/2, state.alt, "ALT", "R");
-
-        // Прицел
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
+    function drawHorizon() {
+        const cx = canvas.width/2, cy = canvas.height/2;
+        ctx.save();
+        ctx.translate(cx, cy);
+        
+        // Вращаем HUD согласно крену (roll)
+        ctx.rotate(state.r * Math.PI / 180);
+        
+        // Масштабируем тангаж: 1 градус = 10 пикселей (чувствительность)
+        // Для iOS когда телефон вертикально, beta ~90. 
+        // Если смотрим прямо, pitch должен быть 0.
+        let pY = state.p * 10; 
+        
+        // Ограничиваем отрисовку, чтобы горизонт не улетал слишком далеко
+        ctx.strokeStyle = '#0f0';
+        
+        // Главная линия горизонта
         ctx.beginPath();
-        ctx.arc(w/2, h/2, 15, 0, Math.PI*2);
-        ctx.moveTo(w/2-30, h/2); ctx.lineTo(w/2-15, h/2);
-        ctx.moveTo(w/2+30, h/2); ctx.lineTo(w/2+15, h/2);
+        ctx.lineWidth = 3;
+        ctx.moveTo(-200, pY); ctx.lineTo(-60, pY);
+        ctx.moveTo(60, pY); ctx.lineTo(200, pY);
         ctx.stroke();
 
-        // Компас
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 16px monospace";
-        ctx.fillText(Math.round(state.h).toString().padStart(3, '0') + "°", w/2-25, 60);
+        // Лестница тангажа (шкала высоты угла)
+        ctx.lineWidth = 1;
+        ctx.font = "10px monospace";
+        ctx.textAlign = "center";
+        for(let i=-90; i<=90; i+=10) {
+            if(i === 0) continue;
+            let y = pY - (i * 10);
+            
+            // Рисуем только те деления, что видны в радиусе 200px
+            if (Math.abs(y) < 250) {
+                ctx.beginPath();
+                // Положительные углы (вверх) - сплошные, отрицательные - пунктир
+                if (i < 0) ctx.setLineDash([5, 5]); else ctx.setLineDash([]);
+                
+                ctx.moveTo(-40, y); ctx.lineTo(40, y);
+                ctx.stroke();
+                ctx.setLineDash([]); // Сброс пунктира
+                
+                ctx.fillText(i, 55, y + 4);
+                ctx.fillText(i, -55, y + 4);
+            }
+        }
+        ctx.restore();
+    }
 
-        requestAnimationFrame(render);
+    function animate() {
+        if(!state.active) return;
+        state.frame++;
+        const w = canvas.width = window.innerWidth;
+        const h = canvas.height = window.innerHeight;
+        
+        ctx.clearRect(0,0,w,h);
+        ctx.strokeStyle = '#0f0';
+        ctx.fillStyle = '#0f0';
+
+        // 1. Горизонт (теперь откалиброван и отзывчив)
+        drawHorizon();
+
+        // 2. Ленты (Speed & Altitude)
+        drawTape(100, h/2, state.s, "SPD", "L");
+        drawTape(w-100, h/2, state.a, "ALT", "R");
+
+        // 3. Центральный прицел (Static)
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(w/2-30, h/2); ctx.lineTo(w/2-10, h/2);
+        ctx.moveTo(w/2+30, h/2); ctx.lineTo(w/2+10, h/2);
+        ctx.moveTo(w/2, h/2-10); ctx.lineTo(w/2, h/2-25);
+        ctx.stroke();
+        // Центральная точка
+        ctx.fillRect(w/2-1, h/2-1, 2, 2);
+
+        // 4. Компас (вверху)
+        ctx.font = "16px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("HDG: " + Math.round(state.h).toString().padStart(3, '0') + "°", w/2, 60);
+
+        // 5. Статус бары (внизу)
+        ctx.textAlign = "left";
+        ctx.font = "10px monospace";
+        ctx.fillText(`BATT: ${state.batt}V`, 30, h-30);
+        ctx.fillText(`SAT: 12`, 30, h-50);
+        ctx.fillText(`REC ●`, w-80, h-30);
+
+        // Имитация динамики (оставляем как в ТЗ)
+        state.s += Math.sin(state.frame/50) * 0.5;
+        state.a += Math.cos(state.frame/100) * 0.2;
+
+        requestAnimationFrame(animate);
     }
 </script>
 </body>
