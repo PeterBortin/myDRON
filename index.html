@@ -3,24 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FPV COMMAND CENTER v8.0</title>
+    <title>FPV COMMAND CENTER v7.1 FIXED</title>
     <style>
         :root { --color: #00ff41; --bg: rgba(0, 50, 0, 0.2); }
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
         body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
-
-        #cam { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;
+        
+        #cam { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; 
                filter: brightness(0.6) contrast(1.4) sepia(0.3) hue-rotate(85deg); }
-
+        
         #canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
-
+        
         .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100;
                    background: radial-gradient(circle, transparent 20%, #000 150%);
                    display: flex; flex-direction: column; justify-content: center; align-items: center; }
-
+        
         .terminal { background: #000; border: 1px solid var(--color); padding: 30px; box-shadow: 0 0 20px var(--color); color: var(--color); text-align: center; }
-
-        .btn { background: var(--color); color: #000; border: none; padding: 15px 40px; font-weight: bold;
+        
+        .btn { background: var(--color); color: #000; border: none; padding: 15px 40px; font-weight: bold; 
                font-family: inherit; cursor: pointer; margin-top: 20px; letter-spacing: 2px; }
 
         #reset-btn {
@@ -31,11 +31,9 @@
         }
 
         .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 15;
-                     background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 255, 0, 0.05) 50%),
+                     background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 255, 0, 0.05) 50%), 
                                  linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
                      background-size: 100% 4px, 3px 100%; pointer-events: none; }
-
-        .hud-element { position: absolute; color: #0f0; font-family: monospace; text-align: center; z-index: 20; }
     </style>
 </head>
 <body>
@@ -58,24 +56,19 @@
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const video = document.getElementById('cam');
-
-    let state = {
-        rawP: 0, rawR: 0, // Прямые данные с гироскопа
+    
+    let state = { 
+        rawP: 0, rawR: 0, // Прямые данные
         smoothP: 0, smoothR: 0, // Сглаженные данные
         offP: 0, offR: 0, // Смещение (калибровка)
-        h: 0, s: 0, a: 0, batt: 100, active: false, frame: 0,
-        lat: 0, lon: 0, speed: 0, heading: 0,
-        lastUpdate: Date.now()
+        h: 0, s: 142, a: 850, batt: 24.4, active: false, frame: 0 
     };
 
-    // Инициализация системы
     function boot() {
-        // Запуск камеры
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
             .then(s => { video.srcObject = s; video.play(); })
             .catch(e => alert("CAM ERR: " + e));
 
-        // Запрос разрешения на использование гироскопа
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             DeviceOrientationEvent.requestPermission()
                 .then(res => { if(res === 'granted') window.addEventListener('deviceorientation', handleGyro); })
@@ -84,91 +77,71 @@
             window.addEventListener('deviceorientation', handleGyro);
         }
 
-        // Запрос разрешения на использование геолокации
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(updateGPS, gpsError, { enableHighAccuracy: true });
-        }
-
         document.getElementById('boot').style.display = 'none';
         document.getElementById('reset-btn').style.display = 'block';
         state.active = true;
         animate();
     }
 
-    // Обработка данных с гироскопа
     function handleGyro(e) {
-        state.rawP = e.beta || 0; // Тангаж
-        state.rawR = e.gamma || 0; // Крен
+        // Ограничиваем "скачки" при переворотах
+        state.rawP = e.beta; // Тангаж
+        state.rawR = e.gamma; // Крен
         state.h = e.webkitCompassHeading || e.alpha || 0;
     }
 
-    // Обновление данных GPS
-    function updateGPS(pos) {
-        state.lat = pos.coords.latitude;
-        state.lon = pos.coords.longitude;
-        state.speed = pos.coords.speed || 0;
-        state.heading = pos.coords.heading || 0;
-    }
-
-    // Ошибка GPS
-    function gpsError(err) {
-        console.warn("GPS ERROR: " + err.message);
-    }
-
-    // Сброс горизонта
     function resetHorizon() {
         state.offP = state.rawP;
         state.offR = state.rawR;
     }
 
-    // Отрисовка горизонта
     function drawHorizon() {
         const cx = canvas.width/2, cy = canvas.height/2;
-
-        // Сглаживание данных
-        state.smoothP += ((state.rawP - state.offP) - state.smoothP) * 0.1;
-        state.smoothR += ((state.rawR - state.offR) - state.smoothR) * 0.1;
+        
+        // Математическое сглаживание (Lerp)
+        state.smoothP += ( (state.rawP - state.offP) - state.smoothP) * 0.1;
+        state.smoothR += ( (state.rawR - state.offR) - state.smoothR) * 0.1;
 
         ctx.save();
         ctx.translate(cx, cy);
-
-        // Вращение по крену
+        
+        // Вращение (Крен)
         ctx.rotate(state.smoothR * Math.PI / 180);
+        
+        // Смещение по вертикали (Тангаж). 1 градус = 8 пикселей
+        let pY = state.smoothP * 8; 
 
-        // Смещение по тангажу
-        let pY = state.smoothP * 8;
-
-        // Отрисовка горизонта
         ctx.strokeStyle = '#0f0';
         ctx.lineWidth = 2;
+        
+        // Главная линия (Горизонт)
         ctx.beginPath();
         ctx.moveTo(-180, pY); ctx.lineTo(-50, pY);
         ctx.moveTo(50, pY); ctx.lineTo(180, pY);
         ctx.stroke();
 
-        // Шкала тангажа
+        // Шкала тангажа (Лестница)
         ctx.lineWidth = 1;
         ctx.font = "10px monospace";
         ctx.textAlign = "center";
-
-        for(let i = -60; i <= 60; i += 10) {
+        
+        for(let i=-60; i<=60; i+=10) {
             if(i === 0) continue;
             let y = pY - (i * 8);
-            if(Math.abs(y) > 200) continue;
+            if(Math.abs(y) > 200) continue; // Не рисуем лишнее
 
             ctx.beginPath();
             if(i < 0) ctx.setLineDash([5, 3]); else ctx.setLineDash([]);
             ctx.moveTo(-30, y); ctx.lineTo(30, y);
             ctx.stroke();
             ctx.setLineDash([]);
-
+            
             ctx.fillText(i, 45, y + 4);
             ctx.fillText(i, -45, y + 4);
         }
         ctx.restore();
     }
 
-    // Отрисовка ленты скорости/высоты
     function drawTape(x, y, value, label, side) {
         ctx.save();
         ctx.translate(x, y);
@@ -187,7 +160,7 @@
             ctx.fillText(i, side === 'L' ? -35 : 15, yPos + 4);
         }
         ctx.restore();
-
+        
         ctx.fillStyle = "rgba(0,255,0,0.15)";
         ctx.fillRect(side === 'L' ? x-45 : x-5, y-15, 50, 30);
         ctx.fillStyle = "#0f0";
@@ -197,9 +170,17 @@
         ctx.fillText(label, side === 'L' ? x-35 : x+5, y-150);
     }
 
-    // Отрисовка HUD
-    function drawHUD() {
-        const w = canvas.width, h = canvas.height;
+    function animate() {
+        if(!state.active) return;
+        state.frame++;
+        const w = canvas.width = window.innerWidth;
+        const h = canvas.height = window.innerHeight;
+        
+        ctx.clearRect(0,0,w,h);
+
+        drawHorizon();
+        drawTape(110, h/2, state.s, "SPD", "L");
+        drawTape(w-110, h/2, state.a, "ALT", "R");
 
         // Прицел
         ctx.strokeStyle = '#0f0';
@@ -215,45 +196,8 @@
         ctx.textAlign = "center";
         ctx.fillText("HDG: " + Math.round(state.h).toString().padStart(3, '0'), w/2, 50);
 
-        // GPS данные
-        if (state.lat && state.lon) {
-            ctx.font = "10px monospace";
-            ctx.fillText(`LAT: ${state.lat.toFixed(6)}`, w/2, 80);
-            ctx.fillText(`LON: ${state.lon.toFixed(6)}`, w/2, 100);
-            ctx.fillText(`SPD: ${(state.speed * 3.6).toFixed(1)} km/h`, w/2, 120);
-        }
-
-        // Батарея
-        ctx.fillStyle = state.batt > 20 ? "#0f0" : "#f00";
-        ctx.fillRect(w - 100, 30, 80, 20);
-        ctx.fillStyle = "#000";
-        ctx.fillRect(w - 98, 32, 76 * (state.batt / 100), 16);
-        ctx.fillStyle = "#0f0";
-        ctx.font = "12px monospace";
-        ctx.fillText(`BATT: ${state.batt}%`, w - 50, 45);
-    }
-
-    // Анимация
-    function animate() {
-        if(!state.active) return;
-        state.frame++;
-        const w = canvas.width = window.innerWidth;
-        const h = canvas.height = window.innerHeight;
-
-        ctx.clearRect(0, 0, w, h);
-
-        // Обновление данных
-        if (Date.now() - state.lastUpdate > 1000) {
-            state.s = Math.max(0, state.s + (Math.sin(state.frame/50) * 0.3));
-            state.a = Math.max(0, state.a + (Math.cos(state.frame/100) * 0.1));
-            state.batt = Math.max(0, state.batt - 0.01);
-            state.lastUpdate = Date.now();
-        }
-
-        drawHorizon();
-        drawTape(110, h/2, state.s, "SPD", "L");
-        drawTape(w-110, h/2, state.a, "ALT", "R");
-        drawHUD();
+        state.s += Math.sin(state.frame/50) * 0.3;
+        state.a += Math.cos(state.frame/100) * 0.1;
 
         requestAnimationFrame(animate);
     }
