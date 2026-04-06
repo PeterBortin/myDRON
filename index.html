@@ -3,252 +3,191 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Retro Tactical HUD - Sensor Link</title>
+    <title>myDRON Tactical OS</title>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #000;
-            overflow: hidden;
-            font-family: 'Courier New', Courier, monospace;
+        :root { --main-color: #00ff00; --alert-color: #ff0000; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+        
+        /* Загрузочный экран */
+        #loader {
+            position: fixed; inset: 0; background: #000; z-index: 1000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: var(--main-color);
         }
+        .logo { font-size: 40px; font-weight: bold; letter-spacing: 15px; margin-bottom: 20px; animation: pulse 1.5s infinite; }
+        .progress-bar { width: 200px; height: 4px; border: 1px solid var(--main-color); position: relative; }
+        .progress-fill { width: 0%; height: 100%; background: var(--main-color); transition: width 0.1s linear; }
+        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
 
-        /* Видео с камеры */
-        #camVideo {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover;
-            z-index: 1;
-            filter: grayscale(1) brightness(0.5) contrast(1.4) sepia(0.3) hue-rotate(90deg);
-            display: none;
-        }
+        /* HUD Элементы */
+        #cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.4; filter: grayscale(1) brightness(0.7) contrast(1.5); z-index: 1; }
+        #hudCanvas { position: relative; z-index: 5; display: block; filter: drop-shadow(0 0 2px var(--main-color)); }
+        .crt { position: fixed; inset: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%), linear-gradient(90deg, rgba(255,0,0,0.05), rgba(0,255,0,0.02), rgba(0,0,255,0.05)); background-size: 100% 3px, 3px 100%; pointer-events: none; z-index: 10; }
 
-        .crt-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 3px, 3px 100%;
-            pointer-events: none;
-            z-index: 10;
+        .btn-launch {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 30, 0, 0.8); color: var(--main-color); border: 2px solid var(--main-color);
+            padding: 15px 40px; font-size: 18px; font-weight: bold; cursor: pointer; z-index: 20;
+            text-transform: uppercase; letter-spacing: 5px; box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
         }
-
-        #hudCanvas {
-            position: relative;
-            display: block;
-            width: 100vw;
-            height: 100vh;
-            z-index: 5;
-            filter: brightness(1.2) contrast(1.1) drop-shadow(0 0 2px #0f0);
-        }
-
-        .controls {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 20;
-            display: flex;
-            gap: 10px;
-        }
-
-        button {
-            background: rgba(0, 20, 0, 0.8);
-            color: #0f0;
-            border: 1px solid #0f0;
-            padding: 10px 15px;
-            text-transform: uppercase;
-            font-size: 11px;
-            cursor: pointer;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
-        }
+        .btn-launch:active { background: var(--main-color); color: #000; }
     </style>
 </head>
 <body>
-    <video id="camVideo" autoplay playsinline></video>
-    <div class="crt-overlay"></div>
-    <canvas id="hudCanvas"></canvas>
 
-    <div class="controls">
-        <button onclick="requestSensors()">Connect Sensors</button>
-        <button onclick="toggleAlert()">Alert</button>
-        <button onclick="resetSim()">Reset</button>
-    </div>
+<div id="loader">
+    <div class="logo">myDRON</div>
+    <div style="font-size: 10px; margin-bottom: 10px;">CONNECTING TO SAT_LINK...</div>
+    <div class="progress-bar"><div id="fill" class="progress-fill"></div></div>
+</div>
 
-    <script>
-        const canvas = document.getElementById('hudCanvas');
-        const ctx = canvas.getContext('2d');
-        const video = document.getElementById('camVideo');
+<video id="cam" autoplay playsinline></video>
+<div class="crt"></div>
+<canvas id="hudCanvas"></canvas>
 
-        let width, height;
-        let frame = 0;
-        let pitch = 0; // Тангаж
-        let roll = 0;  // Крен
-        let speed = 126;
-        let altitude = 7820;
-        let alertMode = false;
-        let sensorsLinked = false;
+<button class="btn-launch" onclick="launchSystem()">Запуск</button>
 
-        function resize() {
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
+<script>
+    const canvas = document.getElementById('hudCanvas');
+    const ctx = canvas.getContext('2d');
+    const video = document.getElementById('cam');
+    let width, height, frame = 0;
+    let pitch = 0, roll = 0, yaw = 0; // x, y, rotation
+    let combatMode = false;
+    let targets = [];
+
+    // 1. Анимация загрузки
+    let prg = 0;
+    const interval = setInterval(() => {
+        prg += Math.random() * 5;
+        document.getElementById('fill').style.width = Math.min(prg, 100) + '%';
+        if(prg >= 100) {
+            clearInterval(interval);
+            setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
         }
-        window.addEventListener('resize', resize);
-        resize();
+    }, 100);
 
-        // Запрос доступа к гироскопу и камере
-        async function requestSensors() {
-            // 1. Камера
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" }, 
-                    audio: false 
-                });
-                video.srcObject = stream;
-                video.style.display = 'block';
-            } catch (err) { console.log("Camera access denied"); }
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
 
-            // 2. Гироскоп (iOS 13+ требует явного разрешения)
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                try {
-                    const permission = await DeviceOrientationEvent.requestPermission();
-                    if (permission === 'granted') {
-                        window.addEventListener('deviceorientation', handleOrientation);
-                        sensorsLinked = true;
-                    }
-                } catch (e) { console.error(e); }
-            } else {
-                // Для Android и старых версий
-                window.addEventListener('deviceorientation', handleOrientation);
-                sensorsLinked = true;
-            }
+    // 2. Инициализация сенсоров
+    async function launchSystem() {
+        combatMode = true;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = stream;
+        } catch(e) { console.error("Camera error"); }
+
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            const res = await DeviceOrientationEvent.requestPermission();
+            if (res === 'granted') window.addEventListener('deviceorientation', e => {
+                yaw = e.alpha;   // Направление (X)
+                pitch = e.beta;  // Наклон (Y)
+                roll = e.gamma;
+            });
+        } else {
+            window.addEventListener('deviceorientation', e => { yaw = e.alpha; pitch = e.beta; roll = e.gamma; });
         }
+        
+        // Генерация случайных "целей" для демо автозахвата
+        targets = Array.from({length: 3}, () => ({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            id: Math.floor(Math.random() * 999)
+        }));
+    }
 
-        function handleOrientation(event) {
-            // В ландшафтном режиме мобильного устройства:
-            // beta управляет наклоном вверх/вниз
-            // gamma управляет наклоном влево/вправо
-            if (window.innerWidth > window.innerHeight) {
-                roll = event.beta;
-                pitch = -event.gamma - 30; 
-            } else {
-                roll = event.gamma;
-                pitch = event.beta - 45;
-            }
-        }
-
-        function updateData() {
-            frame++;
-            // Если датчики не подключены, используем твою старую синусоиду
-            if (!sensorsLinked) {
-                pitch = Math.sin(frame * 0.01) * 10;
-                roll = Math.cos(frame * 0.02) * 5;
-            }
-            speed += (Math.random() - 0.5) * 0.5;
-            altitude += (Math.random() - 0.4) * 2;
-        }
-
-        function drawGrid() {
-            ctx.strokeStyle = 'rgba(0, 50, 0, 0.3)';
-            ctx.lineWidth = 1;
-            for(let i = 0; i < width; i += 40) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
-            }
-            for(let i = 0; i < height; i += 40) {
-                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke();
-            }
-        }
-
-        function drawTape(x, y, val, alignRight = false) {
-            const h = 200, w = 50;
-            ctx.strokeStyle = '#0f0';
-            ctx.fillStyle = '#0f0';
-            ctx.strokeRect(x, y - h/2, w, h);
-            ctx.save();
-            ctx.rect(x, y - h/2, w, h);
-            ctx.clip();
-            for(let i = -6; i <= 6; i++) {
-                let currVal = Math.floor(val/20)*20 + (i * 20);
-                let ty = y - (i * 40) + (val % 20) * 2;
-                ctx.beginPath();
-                ctx.moveTo(alignRight ? x : x + w, ty);
-                ctx.lineTo(alignRight ? x + 10 : x + w - 10, ty);
-                ctx.stroke();
-                ctx.fillText(currVal, alignRight ? x + 15 : x + 5, ty + 5);
-            }
-            ctx.restore();
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
-            ctx.fillRect(x - 5, y - 15, w + 10, 30);
-            ctx.fillStyle = '#0f0';
-            ctx.font = 'bold 14px monospace';
-            ctx.fillText(Math.round(val), x + 10, y + 5);
-        }
-
-        function drawHorizon() {
-            ctx.save();
-            ctx.translate(width / 2, height / 2);
-            ctx.rotate(roll * Math.PI / 180);
-            ctx.translate(0, pitch * 5);
-            ctx.strokeStyle = '#0f0';
-            ctx.lineWidth = 2;
+    function drawTape(x, y, val, label, alignRight = false) {
+        const h = 250, w = 60;
+        ctx.strokeStyle = varColor();
+        ctx.strokeRect(x, y - h/2, w, h);
+        ctx.save();
+        ctx.rect(x, y - h/2, w, h);
+        ctx.clip();
+        
+        for(let i = -10; i <= 10; i++) {
+            let currVal = Math.round(val + i * 10);
+            let ty = y - (i * 30);
             ctx.beginPath();
-            ctx.moveTo(-20, 0); ctx.lineTo(-10, 0); ctx.lineTo(-10, 5);
-            ctx.moveTo(20, 0); ctx.lineTo(10, 0); ctx.lineTo(10, 5);
+            ctx.moveTo(alignRight ? x : x + w, ty);
+            ctx.lineTo(alignRight ? x + 15 : x + w - 15, ty);
             ctx.stroke();
-            for(let i = -2; i <= 2; i++) {
-                if(i === 0) continue;
-                let ty = i * 40;
-                ctx.beginPath();
-                ctx.moveTo(-30, ty); ctx.lineTo(30, ty);
-                ctx.stroke();
-                ctx.font = '10px monospace';
-                ctx.fillText(i * 10, 35, ty + 4);
-            }
-            ctx.restore();
+            ctx.font = '10px monospace';
+            ctx.fillStyle = varColor();
+            ctx.fillText(currVal, alignRight ? x + 20 : x + 5, ty + 5);
         }
+        ctx.restore();
+        ctx.fillText(label, x, y - h/2 - 10);
+    }
 
-        function drawTerminalInfo() {
-            ctx.fillStyle = '#0f0';
-            ctx.font = '12px monospace';
-            const now = new Date();
-            ctx.fillText(now.toLocaleTimeString() + " | APR 06 2026", 20, 30);
-            ctx.fillText(sensorsLinked ? "//SENSORS.ACTIVE" : "//EMULATION.MODE", 20, 50);
-            for(let i = 0; i < 3; i++) {
-                let barH = 40 + Math.sin(frame * 0.05 + i) * 20;
-                ctx.globalAlpha = 0.5;
-                ctx.fillRect(width - 120 + (i * 30), 50, 20, barH);
-                ctx.globalAlpha = 1.0;
-                ctx.strokeRect(width - 120 + (i * 30), 50, 20, barH);
-            }
-        }
+    function varColor() { return combatMode ? '#ff0000' : '#00ff00'; }
 
-        function render() {
-            ctx.clearRect(0, 0, width, height); // Очистка для прозрачности видео
+    function drawCombatHUD() {
+        if(!combatMode) return;
+        
+        targets.forEach(t => {
+            // Анимация захвата
+            let size = 40 + Math.sin(frame * 0.1) * 5;
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 1;
+            
+            // Рамка захвата
+            ctx.strokeRect(t.x - size/2, t.y - size/2, size, size);
+            ctx.beginPath();
+            ctx.moveTo(t.x, t.y - size); ctx.lineTo(t.x, t.y - size/2);
+            ctx.stroke();
+            
+            ctx.font = '10px monospace';
+            ctx.fillText(`TRGT_${t.id}`, t.x + size/2 + 5, t.y);
+            ctx.fillText(`DIST: ${(Math.abs(pitch) * 10).toFixed(0)}m`, t.x + size/2 + 5, t.y + 12);
+            
+            // Линия от центра
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(width/2, height/2);
+            ctx.lineTo(t.x, t.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        });
+    }
 
-            if(alertMode && frame % 30 < 15) {
-                ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
-                ctx.fillRect(0, 0, width, height);
-            }
+    function loop() {
+        frame++;
+        ctx.clearRect(0, 0, width, height);
 
-            drawGrid();
-            updateData();
-            drawHorizon();
-            drawTape(width * 0.15, height / 2, speed);
-            drawTape(width * 0.75, height / 2, altitude, true);
-            drawTerminalInfo();
+        // Сетка
+        ctx.strokeStyle = 'rgba(0, 255, 0, 0.1)';
+        for(let i=0; i<width; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,height); ctx.stroke(); }
 
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.05)';
-            ctx.fillRect(0, (frame * 2) % height, width, 2);
+        // Барабаны: Левый (X - направление), Правый (Y - наклон)
+        drawTape(width * 0.1, height/2, yaw || 0, "AZIMUTH (X)");
+        drawTape(width * 0.85, height/2, pitch || 0, "PITCH (Y)", true);
 
-            requestAnimationFrame(render);
-        }
+        // Центральный прицел
+        ctx.strokeStyle = varColor();
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(width/2, height/2, 20, 0, Math.PI*2);
+        ctx.moveTo(width/2 - 40, height/2); ctx.lineTo(width/2 - 10, height/2);
+        ctx.moveTo(width/2 + 40, height/2); ctx.lineTo(width/2 + 10, height/2);
+        ctx.stroke();
 
-        function toggleAlert() { alertMode = !alertMode; }
-        function resetSim() { speed = 126; altitude = 7820; pitch = 0; roll = 0; }
+        drawCombatHUD();
 
-        render();
-    </script>
+        // Текст системы
+        ctx.fillStyle = varColor();
+        ctx.font = '12px monospace';
+        ctx.fillText(`SYSTEM: ${combatMode ? 'COMBAT_ACTIVE' : 'STANDBY'}`, 20, 30);
+        ctx.fillText(`COORDS: ${yaw.toFixed(2)} / ${pitch.toFixed(2)}`, 20, 45);
+
+        requestAnimationFrame(loop);
+    }
+
+    loop();
+</script>
 </body>
 </html>
