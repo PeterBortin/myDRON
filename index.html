@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FPV Combat HUD | Sensor Link + Target Lock</title>
+    <title>FPV Tactical HUD | Advanced Sensor Link</title>
     <style>
         * {
             margin: 0;
@@ -18,9 +18,11 @@
             height: 100%;
             background: #000;
             overflow: hidden;
-            font-family: 'Courier New', 'Courier', 'Fira Code', monospace;
+            font-family: 'Courier New', 'Courier', 'SF Mono', monospace;
+            touch-action: none; /* улучшение производительности на мобильных */
         }
 
+        /* Видео с камеры (FPV) */
         #camVideo {
             position: fixed;
             top: 0;
@@ -29,23 +31,30 @@
             height: 100%;
             object-fit: cover;
             z-index: 1;
-            filter: grayscale(0.75) brightness(0.55) contrast(1.45) sepia(0.25) hue-rotate(80deg);
-            display: none;
+            filter: grayscale(0.7) brightness(0.58) contrast(1.48) sepia(0.22) hue-rotate(82deg);
+            transform: translateZ(0);
+            will-change: transform;
         }
 
+        /* CRT и винтажный эффект (оптимизирован) */
         .crt-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: repeating-linear-gradient(0deg, rgba(0,20,0,0.2) 0px, rgba(0,20,0,0.2) 2px, transparent 2px, transparent 4px), 
-                        linear-gradient(90deg, rgba(0,255,0,0.03) 0%, rgba(0,0,0,0.1) 50%, rgba(0,255,0,0.03) 100%);
+            background: repeating-linear-gradient(0deg, 
+                rgba(0, 20, 0, 0.18) 0px, 
+                rgba(0, 20, 0, 0.18) 2px, 
+                transparent 2px, 
+                transparent 5px),
+                radial-gradient(circle at 50% 50%, rgba(0,255,0,0.02) 0%, rgba(0,0,0,0.2) 100%);
             pointer-events: none;
             z-index: 10;
             mix-blend-mode: overlay;
         }
 
+        /* Canvas HUD поверх видео */
         #hudCanvas {
             position: absolute;
             top: 0;
@@ -55,68 +64,106 @@
             display: block;
             z-index: 5;
             pointer-events: none;
+            will-change: transform;
         }
 
-        .controls {
+        /* Статус-бар (информация о датчиках) */
+        .status-panel {
             position: fixed;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 20;
-            display: flex;
-            gap: 14px;
-            background: rgba(0, 8, 0, 0.7);
-            backdrop-filter: blur(8px);
-            padding: 10px 22px;
-            border-radius: 50px;
-            border: 1px solid rgba(0, 255, 0, 0.6);
-            box-shadow: 0 0 18px rgba(0, 255, 0, 0.25);
-            pointer-events: auto;
-        }
-
-        button {
-            background: rgba(0, 20, 0, 0.9);
-            color: #0f0;
-            border: 1px solid #0f0;
-            padding: 8px 18px;
-            text-transform: uppercase;
-            font-size: 12px;
-            font-weight: bold;
-            font-family: 'Courier New', monospace;
-            letter-spacing: 1.5px;
-            cursor: pointer;
-            border-radius: 40px;
-            transition: all 0.2s ease;
-            box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
-        }
-
-        button:active {
-            background: #0f0;
-            color: #000;
-            box-shadow: 0 0 18px #0f0;
-            transform: scale(0.96);
-        }
-
-        .status-bar {
-            position: fixed;
-            top: 12px;
+            bottom: 12px;
             left: 12px;
-            z-index: 25;
-            background: rgba(0,0,0,0.55);
-            backdrop-filter: blur(5px);
-            padding: 5px 12px;
+            right: 12px;
+            z-index: 20;
+            background: rgba(0, 10, 0, 0.65);
+            backdrop-filter: blur(12px);
             border-radius: 20px;
-            border-left: 3px solid #0f0;
-            font-size: 10px;
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 0.5px solid rgba(0, 255, 0, 0.4);
+            font-family: monospace;
+            font-size: 9px;
+            letter-spacing: 0.5px;
+            pointer-events: none;
+            color: #0f0;
+            text-shadow: 0 0 2px #0f0;
+        }
+
+        .status-left {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .status-right {
+            text-align: right;
+        }
+
+        .led {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #0f0;
+            box-shadow: 0 0 4px #0f0;
+            margin-right: 6px;
+            animation: pulse 1.2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; transform: scale(0.9);}
+            50% { opacity: 1; transform: scale(1.2);}
+        }
+
+        /* Загрузочный оверлей для запросов доступа */
+        .permission-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.92);
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 24px;
             font-family: monospace;
             color: #0f0;
-            pointer-events: none;
+            text-align: center;
+            padding: 20px;
+            transition: opacity 0.5s ease;
         }
-        
-        @media (max-width: 700px) {
-            button { padding: 6px 12px; font-size: 9px; }
-            .controls { gap: 8px; padding: 8px 14px; bottom: 16px; }
-            .status-bar { font-size: 8px; top: 6px; left: 6px; }
+
+        .permission-text {
+            font-size: 14px;
+            max-width: 280px;
+            border-left: 2px solid #0f0;
+            padding-left: 16px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .loader {
+            width: 40px;
+            height: 40px;
+            border: 2px solid #0f0;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 600px) {
+            .status-panel { font-size: 7px; padding: 6px 12px; bottom: 8px; left: 8px; right: 8px; }
+            .status-left { gap: 8px; }
         }
     </style>
 </head>
@@ -125,26 +172,43 @@
 <video id="camVideo" autoplay playsinline muted></video>
 <div class="crt-overlay"></div>
 <canvas id="hudCanvas"></canvas>
-<div class="controls">
-    <button id="sensorBtn">⚡ LINK SENSORS</button>
-    <button id="alertBtn">🎯 TARGET LOCK</button>
-    <button id="resetBtn">🔍 OBJECT SCAN</button>
+<div class="status-panel" id="statusPanel">
+    <div class="status-left">
+        <span>🔘 SYS: <span id="sysStatusText">INIT</span></span>
+        <span>🎙️ <span id="micStatusText">MIC</span></span>
+        <span>📷 <span id="camStatusText">CAM</span></span>
+        <span>⚡ <span id="gyroStatusText">GYRO</span></span>
+    </div>
+    <div class="status-right">
+        <span id="fpsMonitor">⚡ 60fps</span>
+    </div>
 </div>
-<div class="status-bar" id="sysStatus">⛁ SYSTEM INIT | GYRO: OFF</div>
+
+<div class="permission-overlay" id="permissionOverlay">
+    <div class="loader"></div>
+    <div class="permission-text">🔐 REQUESTING SENSORS<br>CAMERA • GYROSCOPE • MICROPHONE</div>
+    <div style="font-size: 10px; opacity:0.7;">FPV TACTICAL HUD v.2.0</div>
+</div>
 
 <script>
     (function(){
-        // ----- Элементы -----
+        // ---------- DOM элементы ----------
         const canvas = document.getElementById('hudCanvas');
         const ctx = canvas.getContext('2d');
         const video = document.getElementById('camVideo');
-        const sensorBtn = document.getElementById('sensorBtn');
-        const alertBtn = document.getElementById('alertBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const sysStatus = document.getElementById('sysStatus');
+        const permissionOverlay = document.getElementById('permissionOverlay');
+        const sysStatusSpan = document.getElementById('sysStatusText');
+        const micStatusSpan = document.getElementById('micStatusText');
+        const camStatusSpan = document.getElementById('camStatusText');
+        const gyroStatusSpan = document.getElementById('gyroStatusText');
+        const fpsSpan = document.getElementById('fpsMonitor');
         
-        // ----- Размеры -----
+        // ---------- Размеры (оптимизация под мобильные) ----------
         let width, height;
+        let frame = 0;
+        let lastFrameTime = 0;
+        let fps = 60;
+        
         function resizeCanvas() {
             width = window.innerWidth;
             height = window.innerHeight;
@@ -154,47 +218,42 @@
         window.addEventListener('resize', () => { resizeCanvas(); });
         resizeCanvas();
         
-        // ----- Основные переменные телеметрии -----
-        let frame = 0;
-        let pitch = 0;          // тангаж
-        let roll = 0;           // крен
-        let yaw = 0;            // рыскание (0-360)
-        let speed = 126.4;      
-        let altitude = 7820;    
-        let batteryVoltage = 24.8;
-        let rssi = 87;
-        
-        // ----- Флаги и датчики -----
-        let sensorsLinked = false;
+        // ---------- Состояние системы и датчиков ----------
+        let sensorsReady = false;      // Все разрешения получены
         let cameraActive = false;
+        let gyroActive = false;
         let micActive = false;
-        let alertMode = false;      // флаг тревоги / целеуказания
         
-        // ----- НОВЫЕ ФУНКЦИОНАЛЫ: обнаружение объектов и захват цели -----
-        let objectDetectionActive = false;    // анимированная рамка поиска объектов
-        let objectScanProgress = 0;            // 0..100 для анимации сканирования
-        let targetLocked = false;              // захват цели (активный трекинг)
-        let targetX = 0, targetY = 0;          // координаты захваченной цели (относительно центра экрана)
-        let lockPulse = 0;
+        // Телеметрия
+        let pitch = 0, roll = 0, yaw = 0;
+        let speed = 124.8;
+        let altitude = 4560;
+        let batteryVoltage = 25.2;
+        let rssi = 89;
         
-        // ----- Гироскоп + калибровка (плавная фильтрация) -----
-        let deviceOrientationSupported = false;
+        // Плавные фильтры (для устранения рывков)
+        let smoothPitch = 0, smoothRoll = 0;
         let calibrateOffset = { beta: 0, gamma: 0 };
         let isCalibrated = false;
         
-        // Плавные значения pitch/roll (фильтр низких частот)
-        let smoothPitch = 0, smoothRoll = 0;
-        
-        // ----- Микрофон для аудио-реактивности (опционально) -----
+        // Микрофонные данные
         let audioContext = null;
         let micStream = null;
         let audioAnalyser = null;
         let audioDataArray = null;
         let micLevel = 0;
         
-        // ========== 1. КАМЕРА (FPV) ==========
+        // Целеуказание / обнаружение (эстетический компонент без кнопок)
+        let scanActive = true;          // постоянное плавное сканирование
+        let scanAngle = 0;
+        let targetLockX = 0, targetLockY = 0;
+        let hasTarget = false;
+        let lockPulse = 0;
+        
+        // ---------- 1. КАМЕРА (автоматический запрос) ----------
         async function initCamera() {
             try {
+                // Пытаемся получить заднюю камеру для FPV
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: { exact: "environment" } },
                     audio: false 
@@ -202,100 +261,119 @@
                 video.srcObject = stream;
                 video.style.display = 'block';
                 cameraActive = true;
-                sysStatus.innerHTML = "📷 FPV ACTIVE | GYRO: " + (sensorsLinked ? "ON" : "OFF");
+                camStatusSpan.innerText = "ON";
+                camStatusSpan.style.color = "#0f0";
             } catch (err) {
                 try {
+                    // Фолбэк на любую камеру
                     const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
                     video.srcObject = fallbackStream;
                     video.style.display = 'block';
                     cameraActive = true;
-                } catch (e) { cameraActive = false; }
+                    camStatusSpan.innerText = "ON";
+                    camStatusSpan.style.color = "#0f0";
+                } catch (e) {
+                    cameraActive = false;
+                    camStatusSpan.innerText = "OFF";
+                    camStatusSpan.style.color = "#f66";
+                }
             }
         }
         
-        // ========== 2. ГИРОСКОП (плавная обработка без рывков) ==========
-        function handleOrientation(event) {
-            if (!sensorsLinked) return;
-            let beta = event.beta;
-            let gamma = event.gamma;
-            let alpha = event.alpha;
-            if (beta === null || gamma === null) return;
-            
-            if (!isCalibrated && sensorsLinked) {
-                calibrateOffset.beta = beta;
-                calibrateOffset.gamma = gamma;
-                isCalibrated = true;
-            }
-            let rawPitch = (beta - calibrateOffset.beta) * 0.85;
-            let rawRoll = (gamma - calibrateOffset.gamma) * 1.0;
-            rawPitch = Math.min(32, Math.max(-32, rawPitch));
-            rawRoll = Math.min(38, Math.max(-38, rawRoll));
-            
-            // Фильтр экспоненциального сглаживания (убираем рывки)
-            smoothPitch = smoothPitch * 0.85 + rawPitch * 0.15;
-            smoothRoll = smoothRoll * 0.85 + rawRoll * 0.15;
-            pitch = smoothPitch;
-            roll = smoothRoll;
-            
-            if (alpha !== null) yaw = alpha;
-            
-            // Динамическое влияние на скорость/высоту (плавно)
-            if (sensorsLinked) {
+        // ---------- 2. ГИРОСКОП (автоматический запрос, iOS + Android) ----------
+        function initGyroscope() {
+            const handleOrientation = (event) => {
+                if (!gyroActive) return;
+                let beta = event.beta;
+                let gamma = event.gamma;
+                let alpha = event.alpha;
+                if (beta === null || gamma === null) return;
+                
+                if (!isCalibrated && gyroActive) {
+                    calibrateOffset.beta = beta;
+                    calibrateOffset.gamma = gamma;
+                    isCalibrated = true;
+                }
+                
+                let rawPitch = (beta - calibrateOffset.beta) * 0.85;
+                let rawRoll = (gamma - calibrateOffset.gamma) * 1.0;
+                rawPitch = Math.min(32, Math.max(-32, rawPitch));
+                rawRoll = Math.min(38, Math.max(-38, rawRoll));
+                
+                // Экспоненциальное сглаживание (убирает рывки)
+                smoothPitch = smoothPitch * 0.88 + rawPitch * 0.12;
+                smoothRoll = smoothRoll * 0.88 + rawRoll * 0.12;
+                pitch = smoothPitch;
+                roll = smoothRoll;
+                
+                if (alpha !== null) yaw = alpha;
+                
+                // Динамическое влияние на скорость/высоту (реалистичный дрон)
                 let pitchEffect = pitch / 28;
-                speed += pitchEffect * 0.28 + (Math.random() - 0.5) * 0.12;
-                speed = Math.min(430, Math.max(18, speed));
-                let altEffect = (Math.abs(roll) * 0.15) - (pitch * 0.08);
-                altitude += altEffect * 0.4 + (Math.random() - 0.5) * 0.9;
-                altitude = Math.min(13800, Math.max(110, altitude));
-            }
-        }
-        
-        // Инициализация гироскопа с поддержкой iOS
-        async function initGyroscope() {
+                speed += pitchEffect * 0.32 + (Math.random() - 0.5) * 0.12;
+                speed = Math.min(490, Math.max(22, speed));
+                let altEffect = (Math.abs(roll) * 0.18) - (pitch * 0.09);
+                altitude += altEffect * 0.45 + (Math.random() - 0.5) * 0.8;
+                altitude = Math.min(13200, Math.max(150, altitude));
+                
+                // Батарея и RSSI плавно меняются
+                batteryVoltage += (Math.random() - 0.5) * 0.008;
+                batteryVoltage = Math.min(28.2, Math.max(22.4, batteryVoltage));
+                rssi += (Math.random() - 0.5) * 0.3;
+                rssi = Math.min(99, Math.max(45, rssi));
+            };
+            
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                sensorBtn.innerText = "⚡ REQUEST GYRO";
-                sensorBtn.onclick = async () => {
-                    try {
-                        const permission = await DeviceOrientationEvent.requestPermission();
+                // iOS: запрашиваем разрешение сразу при загрузке
+                DeviceOrientationEvent.requestPermission()
+                    .then(permission => {
                         if (permission === 'granted') {
                             window.addEventListener('deviceorientation', handleOrientation);
-                            sensorsLinked = true;
-                            isCalibrated = false;
-                            sensorBtn.innerText = "🔗 GYRO ACTIVE";
-                            sysStatus.innerHTML = "📷 FPV | GYRO: ONLINE";
-                            if (!cameraActive) initCamera();
-                            initMicrophone();
-                        } else { sensorsLinked = false; }
-                    } catch(e) { console.warn(e); }
-                };
+                            gyroActive = true;
+                            gyroStatusSpan.innerText = "ON";
+                            gyroStatusSpan.style.color = "#0f0";
+                            updateSysStatus();
+                        } else {
+                            gyroActive = false;
+                            gyroStatusSpan.innerText = "DENIED";
+                            gyroStatusSpan.style.color = "#f66";
+                        }
+                    })
+                    .catch(err => {
+                        console.warn("Gyro permission error", err);
+                        gyroActive = false;
+                        gyroStatusSpan.innerText = "FAIL";
+                    });
             } else {
-                sensorBtn.onclick = () => {
-                    window.addEventListener('deviceorientation', handleOrientation);
-                    sensorsLinked = true;
-                    isCalibrated = false;
-                    sensorBtn.innerText = "🔗 GYRO ACTIVE";
-                    sysStatus.innerHTML = "📷 FPV | GYRO: ONLINE";
-                    if (!cameraActive) initCamera();
-                    initMicrophone();
-                };
+                // Android / Desktop: автоматически
+                window.addEventListener('deviceorientation', handleOrientation);
+                gyroActive = true;
+                gyroStatusSpan.innerText = "ON";
+                gyroStatusSpan.style.color = "#0f0";
+                updateSysStatus();
             }
         }
         
-        // ========== 3. МИКРОФОН (опционально, без рывков) ==========
+        // ---------- 3. МИКРОФОН (опциональный, аудиореактивность) ----------
         async function initMicrophone() {
-            if (micActive) return;
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 micStream = stream;
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioContext.createMediaStreamSource(stream);
                 audioAnalyser = audioContext.createAnalyser();
-                audioAnalyser.fftSize = 256;
+                audioAnalyser.fftSize = 128;
                 source.connect(audioAnalyser);
                 audioDataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
                 micActive = true;
+                micStatusSpan.innerText = "LIVE";
+                micStatusSpan.style.color = "#0f0";
                 if (audioContext.state === 'suspended') await audioContext.resume();
-            } catch(err) { micActive = false; }
+            } catch(err) {
+                micActive = false;
+                micStatusSpan.innerText = "OFF";
+                micStatusSpan.style.color = "#fa0";
+            }
         }
         
         function updateMicLevel() {
@@ -304,337 +382,316 @@
             let sum = 0;
             for (let i = 0; i < audioDataArray.length; i++) sum += audioDataArray[i];
             let avg = sum / (audioDataArray.length || 1);
-            micLevel = Math.min(1, avg / 170);
-            if (sensorsLinked && micActive && micLevel > 0.12) {
-                speed += micLevel * 0.35;
-                speed = Math.min(450, speed);
+            micLevel = Math.min(1, avg / 160);
+            if (micActive && micLevel > 0.12) {
+                speed += micLevel * 0.28;
+                speed = Math.min(500, speed);
             }
         }
         
-        // ========== 4. СИМУЛЯЦИЯ ЕСЛИ ДАТЧИКИ НЕ ПОДКЛЮЧЕНЫ (плавно) ==========
+        // ---------- 4. СИМУЛЯЦИЯ ЕСЛИ ГИРОСКОП НЕ ДОСТУПЕН ----------
         function updateSimulatedData() {
-            if (!sensorsLinked) {
-                smoothPitch = smoothPitch * 0.96 + (Math.sin(frame * 0.009) * 6 + Math.cos(frame * 0.005) * 2) * 0.04;
-                smoothRoll = smoothRoll * 0.96 + (Math.sin(frame * 0.011) * 4.5 + Math.cos(frame * 0.007) * 2) * 0.04;
+            if (!gyroActive) {
+                // Эмуляция плавного движения для демонстрации интерфейса
+                smoothPitch = smoothPitch * 0.97 + (Math.sin(frame * 0.008) * 5 + Math.cos(frame * 0.006) * 2) * 0.03;
+                smoothRoll = smoothRoll * 0.97 + (Math.sin(frame * 0.009) * 4 + Math.cos(frame * 0.005) * 1.8) * 0.03;
                 pitch = smoothPitch;
                 roll = smoothRoll;
-                yaw = (frame * 0.35) % 360;
-                speed += (Math.sin(frame * 0.015) * 0.22) + (Math.random() - 0.5) * 0.3;
-                altitude += (Math.sin(frame * 0.007) * 0.9) + (Math.random() - 0.5) * 1.1;
+                yaw = (frame * 0.32) % 360;
+                speed += (Math.sin(frame * 0.012) * 0.18) + (Math.random() - 0.5) * 0.22;
+                altitude += (Math.sin(frame * 0.006) * 0.7) + (Math.random() - 0.5) * 0.9;
+                batteryVoltage += (Math.random() - 0.5) * 0.01;
+                rssi += (Math.random() - 0.5) * 0.35;
             }
-            speed = Math.min(520, Math.max(12, speed));
-            altitude = Math.min(14000, Math.max(90, altitude));
-            batteryVoltage = Math.min(28.5, Math.max(21.0, batteryVoltage + (Math.random() - 0.5)*0.01));
-            rssi = Math.min(100, Math.max(32, rssi + (Math.random() - 0.5)*0.4));
-            if (alertMode) rssi = Math.max(38, rssi - 0.2);
+            // Ограничения
+            speed = Math.min(540, Math.max(15, speed));
+            altitude = Math.min(13800, Math.max(100, altitude));
+            batteryVoltage = Math.min(28.6, Math.max(21.2, batteryVoltage));
+            rssi = Math.min(100, Math.max(35, rssi));
         }
         
-        // ========== НОВАЯ ЛОГИКА: Обнаружение объектов (анимированная рамка) ==========
-        function startObjectScan() {
-            objectDetectionActive = true;
-            objectScanProgress = 0;
-            targetLocked = false;   // сброс захвата цели при новом сканировании
-            alertMode = false;
-            alertBtn.style.borderColor = "#0f0";
-            alertBtn.style.boxShadow = "0 0 5px #0f0";
-        }
-        
-        // ========== ЗАХВАТ ЦЕЛИ (TARGET LOCK) ==========
-        function engageTargetLock() {
-            if (!objectDetectionActive && !targetLocked) {
-                // Если нет активного сканирования, запускаем быстрое обнаружение с захватом
-                objectDetectionActive = true;
-                objectScanProgress = 0;
-                targetLocked = false;
-            }
-            // Через небольшую задержку "захватываем" случайную цель в области HUD
-            // Эмулируем обнаружение цели в центре поля зрения
-            setTimeout(() => {
-                if (objectDetectionActive || !targetLocked) {
-                    // Генерируем координаты цели относительно центра ( -150..150 по X и Y )
-                    targetX = (Math.random() - 0.5) * 280;
-                    targetY = (Math.random() - 0.5) * 180 - 20;
-                    targetLocked = true;
-                    objectDetectionActive = false;   // сканирование завершено, цель захвачена
-                    alertMode = true;                 // Включаем режим боевой тревоги
-                    alertBtn.style.borderColor = "#f44";
-                    alertBtn.style.boxShadow = "0 0 12px #f44";
-                    sysStatus.innerHTML = "🎯 TARGET LOCKED | ENGAGED";
-                }
-            }, 280);
-        }
-        
-        // Обновление анимации сканирования (прогресс)
-        function updateObjectScan() {
-            if (objectDetectionActive) {
-                objectScanProgress += 2.2;
-                if (objectScanProgress >= 100) {
-                    objectDetectionActive = false;
-                    // По завершению скана: автоматический захват цели в зоне обзора
-                    targetX = (Math.random() - 0.5) * 300;
-                    targetY = (Math.random() - 0.5) * 200 - 20;
-                    targetLocked = true;
-                    alertMode = true;
-                    alertBtn.style.borderColor = "#f44";
-                    alertBtn.style.boxShadow = "0 0 12px #f44";
-                    sysStatus.innerHTML = "⚠️ OBJECT DETECTED | LOCK ACQUIRED";
-                }
+        // ---------- Функция обновления статуса системы ----------
+        function updateSysStatus() {
+            if (cameraActive && gyroActive) {
+                sysStatusSpan.innerText = "ONLINE";
+                sysStatusSpan.style.color = "#0f0";
+            } else if (cameraActive || gyroActive) {
+                sysStatusSpan.innerText = "PARTIAL";
+                sysStatusSpan.style.color = "#ffa500";
+            } else {
+                sysStatusSpan.innerText = "STANDBY";
+                sysStatusSpan.style.color = "#f88";
             }
         }
         
-        // Анимированная рамка сканирования / захваченной цели
-        function drawTargetingFrame() {
-            if (objectDetectionActive) {
-                let scanRadius = 55 + (Math.sin(frame * 0.15) * 8);
-                let angle = (frame * 4) % 360;
-                ctx.save();
-                ctx.shadowBlur = 0;
-                ctx.strokeStyle = `rgba(0, 255, 200, ${0.6 + Math.sin(frame*0.2)*0.3})`;
-                ctx.lineWidth = 2.5;
-                let centerX = width/2;
-                let centerY = height/2 - 20;
-                // Круг сканирования
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, scanRadius, 0, Math.PI*2);
-                ctx.stroke();
-                // Прогресс-бар сканирования
-                ctx.beginPath();
-                let progressAngle = (objectScanProgress / 100) * Math.PI * 2;
-                ctx.arc(centerX, centerY, scanRadius+5, -Math.PI/2, -Math.PI/2 + progressAngle);
-                ctx.stroke();
-                // Текст сканирования
-                ctx.font = "bold 12px monospace";
-                ctx.fillStyle = "#0f0";
-                ctx.fillText(`SCAN: ${Math.floor(objectScanProgress)}%`, centerX-40, centerY - scanRadius-8);
-                ctx.fillText("🔍 SEARCHING", centerX-50, centerY + scanRadius+12);
-                ctx.restore();
-            }
-            
-            if (targetLocked && !objectDetectionActive) {
-                // Анимированный прицел захвата цели с пульсацией
-                lockPulse = (lockPulse + 0.12) % (Math.PI*2);
-                let pulseScale = 0.7 + Math.sin(lockPulse * 3) * 0.2;
-                let tx = width/2 + targetX;
-                let ty = height/2 + targetY - 15;
-                ctx.save();
-                ctx.strokeStyle = "#f44";
-                ctx.lineWidth = 2.2;
-                ctx.shadowBlur = 0;
-                // Внешний квадрат
-                let size = 38 * pulseScale;
-                ctx.strokeRect(tx - size/2, ty - size/2, size, size);
-                // Угловые маркеры
-                ctx.beginPath();
-                ctx.moveTo(tx - size/2 - 6, ty - size/2);
-                ctx.lineTo(tx - size/2, ty - size/2);
-                ctx.lineTo(tx - size/2, ty - size/2 - 6);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(tx + size/2 + 6, ty - size/2);
-                ctx.lineTo(tx + size/2, ty - size/2);
-                ctx.lineTo(tx + size/2, ty - size/2 - 6);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(tx - size/2 - 6, ty + size/2);
-                ctx.lineTo(tx - size/2, ty + size/2);
-                ctx.lineTo(tx - size/2, ty + size/2 + 6);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(tx + size/2 + 6, ty + size/2);
-                ctx.lineTo(tx + size/2, ty + size/2);
-                ctx.lineTo(tx + size/2, ty + size/2 + 6);
-                ctx.stroke();
-                // надпись LOCK
-                ctx.font = "bold 10px monospace";
-                ctx.fillStyle = "#f88";
-                ctx.fillText("🔒 TARGET", tx-25, ty - size/2 - 4);
-                ctx.fillText("LOCK", tx-15, ty + size/2 + 12);
-                ctx.restore();
-            }
-        }
-        
-        // ========== ОТРИСОВКА HUD (Питч/Ролл — вверху слева, компас — справа увеличен) ==========
-        function drawAttitudeIndicators() {
-            // Блок питч/ролл (слева вверху)
-            ctx.font = "bold 14px 'Courier New'";
+        // ---------- ОТРИСОВКА HUD (полностью оптимизированная для мобильных) ----------
+        function drawAttitudeBlock() {
+            ctx.font = "bold 12px 'Courier New', monospace";
             ctx.fillStyle = "#0f0";
-            ctx.fillText(`PITCH ${pitch.toFixed(1)}°`, 20, 48);
-            ctx.fillText(`ROLL ${roll.toFixed(1)}°`, 20, 78);
-            ctx.fillText(`YAW ${Math.floor(yaw)}°`, 20, 108);
-            ctx.fillText(`BAT ${batteryVoltage.toFixed(1)}V`, 20, 138);
-            // Индикатор RSSI графический
-            ctx.fillStyle = `rgba(0, 255, 0, 0.5)`;
-            ctx.fillRect(20, 152, (rssi/100)*70, 8);
-            ctx.strokeStyle = "#0f0";
-            ctx.strokeRect(20, 152, 70, 8);
-            ctx.fillStyle = "#0f0";
-            ctx.fillText(`RSSI ${Math.floor(rssi)}%`, 20, 168);
-        }
-        
-        // Увеличенный компас (справа вверху, крупнее)
-        function drawCompass() {
-            let compassX = width - 95;
-            let compassY = 80;
-            let radius = 58;
-            ctx.save();
             ctx.shadowBlur = 0;
-            ctx.beginPath();
-            ctx.arc(compassX, compassY, radius, 0, Math.PI*2);
+            ctx.fillText(`PITCH ${pitch.toFixed(1)}°`, 16, 44);
+            ctx.fillText(`ROLL ${roll.toFixed(1)}°`, 16, 70);
+            ctx.fillText(`YAW ${Math.floor(yaw)}°`, 16, 96);
+            ctx.fillText(`BAT ${batteryVoltage.toFixed(1)}V`, 16, 122);
+            // Индикатор RSSI полоска
+            ctx.fillStyle = `rgba(0, 255, 0, 0.65)`;
+            ctx.fillRect(16, 135, (rssi/100)*68, 7);
             ctx.strokeStyle = "#0f0";
-            ctx.lineWidth = 1.5;
+            ctx.strokeRect(16, 135, 68, 7);
+            ctx.fillStyle = "#0f0";
+            ctx.fillText(`RSSI ${Math.floor(rssi)}%`, 16, 156);
+        }
+        
+        // Увеличенный компас справа
+        function drawCompassLarge() {
+            let cX = width - 78;
+            let cY = 82;
+            let r = 56;
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cX, cY, r, 0, Math.PI*2);
+            ctx.strokeStyle = "#0f0";
+            ctx.lineWidth = 1.3;
             ctx.stroke();
             for(let deg = 0; deg < 360; deg += 30) {
                 let rad = (deg - yaw) * Math.PI/180;
-                let x1 = compassX + Math.sin(rad) * (radius-10);
-                let y1 = compassY - Math.cos(rad) * (radius-10);
-                let mark = (deg === 0) ? "N" : (deg === 90 ? "E" : (deg === 180 ? "S" : (deg === 270 ? "W" : deg)));
+                let x1 = cX + Math.sin(rad) * (r-10);
+                let y1 = cY - Math.cos(rad) * (r-10);
+                let label = deg === 0 ? "N" : (deg === 90 ? "E" : (deg === 180 ? "S" : (deg === 270 ? "W" : deg)));
                 ctx.fillStyle = "#0f0";
-                ctx.font = deg % 90 === 0 ? "bold 14px monospace" : "10px monospace";
-                ctx.fillText(mark, x1-6, y1+4);
+                ctx.font = (deg % 90 === 0) ? "bold 13px monospace" : "9px monospace";
+                ctx.fillText(label, x1-5, y1+4);
             }
             // Стрелка курса
             ctx.beginPath();
-            ctx.moveTo(compassX, compassY - radius + 8);
-            ctx.lineTo(compassX-6, compassY - radius + 18);
-            ctx.lineTo(compassX+6, compassY - radius + 18);
-            ctx.fillStyle = "#f80";
+            ctx.moveTo(cX, cY - r + 6);
+            ctx.lineTo(cX-5, cY - r + 14);
+            ctx.lineTo(cX+5, cY - r + 14);
+            ctx.fillStyle = "#fa0";
             ctx.fill();
             ctx.fillStyle = "#0f0";
-            ctx.font = "bold 11px monospace";
-            ctx.fillText("HDG", compassX-12, compassY-radius-5);
+            ctx.font = "8px monospace";
+            ctx.fillText("HDG", cX-12, cY-r-4);
             ctx.restore();
         }
         
-        // Ленты скорости и высоты (улучшенная плавность)
+        // Ленты скорости и высоты (плавные, без перерисовки лишнего)
         function drawTape(x, y, value, label, unit, alignRight) {
-            ctx.font = "bold 13px monospace";
+            ctx.font = "bold 11px monospace";
             ctx.fillStyle = "#0f0";
-            ctx.fillText(label, alignRight ? x-45 : x+5, y-42);
-            let stepVal = 20;
-            let startVal = Math.floor(value/stepVal)*stepVal - 60;
+            ctx.fillText(label, alignRight ? x-40 : x+5, y-38);
+            let step = 20;
+            let startVal = Math.floor(value/step)*step - 60;
             ctx.beginPath();
             ctx.lineWidth = 1;
-            for(let v = startVal; v <= startVal+120; v+= stepVal){
-                let ty = y + (value - v)*1.3;
-                if(ty > 35 && ty < height-35){
+            for(let v = startVal; v <= startVal+120; v+= step){
+                let ty = y + (value - v)*1.25;
+                if(ty > 30 && ty < height-30){
                     ctx.beginPath();
-                    ctx.moveTo(alignRight ? x-18 : x+18, ty);
-                    ctx.lineTo(alignRight ? x : x+28, ty);
+                    ctx.moveTo(alignRight ? x-16 : x+16, ty);
+                    ctx.lineTo(alignRight ? x : x+26, ty);
                     ctx.stroke();
-                    ctx.fillText(Math.floor(v), alignRight ? x-42 : x+22, ty+4);
+                    ctx.fillText(Math.floor(v), alignRight ? x-38 : x+22, ty+4);
                 }
             }
             ctx.fillStyle = "rgba(0,255,0,0.2)";
-            ctx.fillRect(alignRight ? x-42 : x, y-10, 36, 20);
+            ctx.fillRect(alignRight ? x-38 : x, y-9, 32, 18);
             ctx.fillStyle = "#0f0";
-            ctx.font = "bold 18px monospace";
-            ctx.fillText(Math.floor(value), alignRight ? x-32 : x+8, y+6);
-            ctx.font = "9px monospace";
-            ctx.fillText(unit, alignRight ? x-12 : x+40, y+4);
+            ctx.font = "bold 17px monospace";
+            ctx.fillText(Math.floor(value), alignRight ? x-28 : x+7, y+6);
+            ctx.font = "8px monospace";
+            ctx.fillText(unit, alignRight ? x-10 : x+35, y+4);
         }
         
-        // Искусственный горизонт плавный
-        function drawHorizon() {
+        // Искусственный горизонт (плавный)
+        function drawArtificialHorizon() {
             ctx.save();
-            ctx.translate(width/2, height/2 + 25);
+            ctx.translate(width/2, height/2 + 20);
             ctx.rotate(roll * Math.PI / 180);
             ctx.beginPath();
-            ctx.moveTo(-200, pitch * 1.9);
-            ctx.lineTo(200, pitch * 1.9);
-            ctx.lineWidth = 2.2;
+            ctx.moveTo(-220, pitch * 1.8);
+            ctx.lineTo(220, pitch * 1.8);
+            ctx.lineWidth = 2;
             ctx.strokeStyle = "#0f0";
             ctx.stroke();
             for(let ang = -30; ang <= 30; ang += 10) {
-                let yOff = ang * 1.5 + pitch * 1.9;
-                if(Math.abs(yOff) < 150){
+                let yOff = ang * 1.4 + pitch * 1.8;
+                if(Math.abs(yOff) < 140){
                     ctx.beginPath();
-                    ctx.moveTo(ang===0? -45:-25, yOff);
-                    ctx.lineTo(ang===0? 45:25, yOff);
+                    ctx.moveTo(ang===0? -50:-28, yOff);
+                    ctx.lineTo(ang===0? 50:28, yOff);
                     ctx.stroke();
                     ctx.fillStyle="#0f0";
-                    ctx.font="10px monospace";
-                    ctx.fillText(ang+"°", 55, yOff+4);
-                    ctx.fillText(ang+"°", -75, yOff+4);
+                    ctx.font="9px monospace";
+                    ctx.fillText(ang+"°", 58, yOff+4);
+                    ctx.fillText(ang+"°", -78, yOff+4);
                 }
             }
             ctx.restore();
         }
         
-        // Статусная строка + микрофон
-        function drawBottomStatus() {
-            let statusStr = sensorsLinked ? "◉ GYRO-LINK" : "◎ GYRO-OFF";
-            statusStr += cameraActive ? " | 📷 FPV" : " | 📷 CAM-OFF";
-            if(micActive) statusStr += " | 🎙️ AUDIO";
+        // Эффект постоянного сканирования (без кнопок, эстетика)
+        function drawRadarScan() {
+            scanAngle = (scanAngle + 1.8) % 360;
+            let centerX = width - 70;
+            let centerY = height - 65;
+            let radius = 32;
+            ctx.save();
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI*2);
+            ctx.strokeStyle = "#0f0";
+            ctx.stroke();
+            let rad = scanAngle * Math.PI/180;
+            let lineX = centerX + Math.cos(rad) * radius;
+            let lineY = centerY + Math.sin(rad) * radius;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(lineX, lineY);
+            ctx.strokeStyle = "#0f0";
+            ctx.stroke();
             ctx.fillStyle = "#0f0";
-            ctx.font = "9px monospace";
-            ctx.fillText(statusStr, 18, height-16);
-            ctx.fillText(`DRONE SYS v.4.2 | ${new Date().toLocaleTimeString()}`, width-240, height-12);
-            if(micActive && micLevel>0.05){
-                ctx.fillStyle = `rgba(0,255,0,${0.2+micLevel*0.3})`;
-                ctx.fillRect(width-45, height-28, 15, 8);
+            ctx.font = "7px monospace";
+            ctx.fillText("SCAN", centerX-12, centerY-radius-3);
+            ctx.globalAlpha = 1;
+            ctx.restore();
+            
+            // Если есть целеуказание (эффект захвата)
+            if (hasTarget) {
+                lockPulse = (lockPulse + 0.1) % (Math.PI*2);
+                let pulse = 0.6 + Math.sin(lockPulse * 3) * 0.2;
+                let tx = width/2 + targetLockX;
+                let ty = height/2 + targetLockY - 20;
+                ctx.save();
+                ctx.strokeStyle = "#f44";
+                ctx.lineWidth = 2;
+                let sz = 34 * pulse;
+                ctx.strokeRect(tx - sz/2, ty - sz/2, sz, sz);
+                ctx.beginPath();
+                ctx.moveTo(tx - sz/2 - 4, ty - sz/2);
+                ctx.lineTo(tx - sz/2, ty - sz/2);
+                ctx.lineTo(tx - sz/2, ty - sz/2 - 4);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(tx + sz/2 + 4, ty - sz/2);
+                ctx.lineTo(tx + sz/2, ty - sz/2);
+                ctx.lineTo(tx + sz/2, ty - sz/2 - 4);
+                ctx.stroke();
+                ctx.fillStyle = "#f88";
+                ctx.font = "bold 8px monospace";
+                ctx.fillText("LOCK", tx-16, ty - sz/2 - 3);
+                ctx.restore();
             }
         }
         
-        // Эффект тревоги (ALERT MODE)
-        function drawAlertEffect() {
-            if(alertMode && !objectDetectionActive && (Math.floor(frame/12)%2===0)){
-                ctx.fillStyle = "rgba(255, 30, 0, 0.18)";
-                ctx.fillRect(0,0,width,height);
-                ctx.fillStyle = "#f44";
-                ctx.font = "bold 16px monospace";
-                ctx.fillText("⚠️ COMBAT ALERT ⚠️", width/2-100, 45);
+        // Динамический целевой захват (имитация без кнопок, для атмосферы)
+        function updateTargetSimulation() {
+            if (!hasTarget && frame % 380 === 120) {
+                // Случайное появление цели в поле зрения
+                targetLockX = (Math.random() - 0.5) * 240;
+                targetLockY = (Math.random() - 0.5) * 160 - 10;
+                hasTarget = true;
+                setTimeout(() => {
+                    if (hasTarget) hasTarget = false;
+                }, 5000);
             }
         }
         
-        // ========== ОСНОВНОЙ ЦИКЛ АНИМАЦИИ (плавный, 60fps) ==========
+        // Нижняя информационная панель (статус)
+        function drawBottomInfo() {
+            let timeStr = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+            ctx.fillStyle = "#0f0";
+            ctx.font = "8px monospace";
+            ctx.fillText(`${timeStr} | ALT ${Math.floor(altitude)}m | SPD ${Math.floor(speed)}km/h`, 16, height-12);
+            if (micActive && micLevel > 0.08) {
+                ctx.fillStyle = `rgba(0,255,0,0.5)`;
+                ctx.fillRect(width-38, height-22, 12, 6);
+            }
+        }
+        
+        // Эффект сканирующей строки (ретро)
+        function drawScanline() {
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.03)';
+            ctx.fillRect(0, (frame * 2.2) % height, width, 3);
+        }
+        
+        // Обновление FPS монитора
+        function updateFPS() {
+            const now = performance.now();
+            if (lastFrameTime) {
+                const delta = now - lastFrameTime;
+                if (delta > 0) {
+                    let currentFps = Math.round(1000 / delta);
+                    fps = Math.min(60, Math.max(30, currentFps));
+                    fpsSpan.innerText = `⚡ ${fps}fps`;
+                }
+            }
+            lastFrameTime = now;
+        }
+        
+        // ---------- ГЛАВНЫЙ ЦИКЛ АНИМАЦИИ (оптимизированный для мобильных) ----------
         function animate() {
             frame++;
+            updateFPS();
             updateSimulatedData();
             updateMicLevel();
-            updateObjectScan();      // прогресс сканирования объектов
+            updateTargetSimulation();
             
             ctx.clearRect(0, 0, width, height);
-            drawHorizon();
-            drawTape(width * 0.08, height/2, speed, "SPD", "km/h", false);
-            drawTape(width * 0.92, height/2, altitude, "ALT", "m", true);
-            drawAttitudeIndicators();
-            drawCompass();
-            drawTargetingFrame();    // рамка обнаружения / захват цели
-            drawAlertEffect();
-            drawBottomStatus();
+            drawArtificialHorizon();
+            drawTape(width * 0.09, height/2, speed, "SPD", "km/h", false);
+            drawTape(width * 0.91, height/2, altitude, "ALT", "m", true);
+            drawAttitudeBlock();
+            drawCompassLarge();
+            drawRadarScan();
+            drawBottomInfo();
+            drawScanline();
             
-            // Сканирующая линия CRT
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.035)';
-            ctx.fillRect(0, (frame * 2.5) % height, width, 4);
             requestAnimationFrame(animate);
         }
         
-        // ========== НАЗНАЧЕНИЕ КНОПОК (обновленный функционал) ==========
-        resetBtn.onclick = () => {
-            startObjectScan();    // Запуск обнаружения объектов с анимированной рамкой
-            resetBtn.style.transform = "scale(0.96)";
-            setTimeout(() => { resetBtn.style.transform = ""; }, 150);
-            sysStatus.innerHTML = "🔍 OBJECT SCAN ACTIVE";
-        };
+        // ---------- ЗАПУСК ВСЕХ ДОСТУПОВ АВТОМАТИЧЕСКИ ----------
+        async function requestAllPermissionsAndStart() {
+            // Параллельный запрос всех разрешений
+            const promises = [];
+            promises.push(initCamera().catch(e => console.warn("cam error")));
+            promises.push(initMicrophone().catch(e => console.warn("mic error")));
+            // Гироскоп инициализируется отдельно (iOS требует отдельный вызов)
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    await DeviceOrientationEvent.requestPermission();
+                    initGyroscope();
+                } catch(e) { gyroActive = false; }
+            } else {
+                initGyroscope();
+            }
+            
+            await Promise.all(promises);
+            // Скрываем оверлей через небольшую задержку
+            setTimeout(() => {
+                if (permissionOverlay) {
+                    permissionOverlay.style.opacity = "0";
+                    setTimeout(() => {
+                        permissionOverlay.style.display = "none";
+                    }, 500);
+                }
+                updateSysStatus();
+            }, 800);
+        }
         
-        alertBtn.onclick = () => {
-            engageTargetLock();   // Захват цели + тревога
-            alertBtn.style.transform = "scale(0.96)";
-            setTimeout(() => { alertBtn.style.transform = ""; }, 150);
-        };
+        // Старт системы: все доступы запрашиваются сразу
+        requestAllPermissionsAndStart();
         
-        // Инициализация
-        initCamera();
-        initGyroscope();
+        // Возобновление аудиоконтекста для iOS после любого касания
+        const resumeAudio = () => {
+            if (audioContext && audioContext.state === 'suspended') audioContext.resume();
+            document.body.removeEventListener('touchstart', resumeAudio);
+        };
+        document.body.addEventListener('touchstart', resumeAudio);
+        
+        // Запуск анимации
         animate();
-        
-        // Возобновление аудио контекста при касании
-        document.body.addEventListener('touchstart', () => {
-            if(audioContext && audioContext.state === 'suspended') audioContext.resume();
-        }, { once: true });
-        
-        // Сброс стилей при загрузке
-        sysStatus.innerHTML = "⛁ SENSORS READY | PRESS LINK";
+        resizeCanvas();
     })();
 </script>
 </body>
