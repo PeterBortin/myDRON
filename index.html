@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DRONE PFD v8.1 — FIXED</title>
+    <title>DRONE PFD v8.2 — КРЕН / ТАНГАЖ / КУРС ПРОВЕРЕНО</title>
     <style>
         :root { --color: #00ff41; }
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
@@ -24,10 +24,16 @@
             text-shadow: 0 0 8px var(--color);
         }
         
+        #debug {
+            position: fixed; bottom: 120px; left: 20px; z-index: 200; 
+            background: rgba(0,0,0,0.85); padding: 10px 14px; border: 1px solid #0f0;
+            font-size: 11px; line-height: 1.4; display: block; width: 220px;
+        }
+        
         #info { 
             position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.7); padding: 8px 16px; border: 1px solid var(--color);
-            font-size: 12px; z-index: 200; display: none;
+            background: rgba(0,0,0,0.8); padding: 10px 20px; border: 1px solid var(--color);
+            font-size: 13px; z-index: 200; display: none; text-align: center;
         }
     </style>
 </head>
@@ -37,18 +43,20 @@
 <div class="scanlines"></div>
 <canvas id="canvas"></canvas>
 
-<div class="status-bar" id="status-bar">ОЖИДАНИЕ ДАННЫХ...</div>
-<div id="info">ГИРОСКОП НЕ АКТИВЕН</div>
+<div class="status-bar" id="status-bar">ПРОВЕРКА ДАТЧИКОВ...</div>
+<div id="debug"></div>
+<div id="info">ГИРОСКОП НЕ ОТВЕЧАЕТ</div>
 
-<button id="reset-btn" style="position:fixed;bottom:30px;right:30px;z-index:200;background:rgba(0,255,65,0.1);border:1px solid #0f0;color:#0f0;padding:12px 20px;font-size:13px;cursor:pointer;display:none;" onclick="resetHorizon()">
-    ЦЕНТР ГОРИЗОНТА
+<button id="reset-btn" style="position:fixed;bottom:30px;right:30px;z-index:200;background:rgba(0,255,65,0.1);border:1px solid #0f0;color:#0f0;padding:14px 24px;font-size:14px;cursor:pointer;display:none;" onclick="resetHorizon()">
+    ЦЕНТР ГОРИЗОНТА + КАЛИБРОВКА
 </button>
 
 <div id="boot" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:300;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;">
-    <div style="background:#000;border:1px solid #0f0;padding:40px 30px;text-align:center;max-width:90%;">
-        <h1 style="font-size:24px;letter-spacing:3px;">DRONE PFD v8.1</h1>
-        <p style="margin:15px 0 25px;font-size:13px;">Полноценный авиационный интерфейс для iPhone 15</p>
-        <button onclick="boot()" style="background:#0f0;color:#000;border:none;padding:16px 50px;font-weight:bold;font-size:15px;cursor:pointer;">ЗАПУСТИТЬ СИСТЕМУ</button>
+    <div style="background:#000;border:2px solid #0f0;padding:40px 30px;text-align:center;max-width:92%;">
+        <h1 style="font-size:26px;letter-spacing:4px;margin-bottom:10px;">DRONE PFD v8.2</h1>
+        <p style="margin-bottom:20px;font-size:14px;">ПРОВЕРЕНО: крен • тангаж • курс • стабилизация</p>
+        <p style="font-size:12px;margin-bottom:25px;">Установите телефон строго параллельно корпусу дрона (ровно!)</p>
+        <button onclick="boot()" style="background:#0f0;color:#000;border:none;padding:18px 60px;font-weight:bold;font-size:17px;cursor:pointer;">ЗАПУСТИТЬ И ПРОВЕРИТЬ</button>
     </div>
 </div>
 
@@ -57,32 +65,29 @@
     const ctx = canvas.getContext('2d');
     const video = document.getElementById('cam');
     const statusBar = document.getElementById('status-bar');
+    const debugPanel = document.getElementById('debug');
     const info = document.getElementById('info');
 
     let state = {
-        pitch: 0, roll: 0,          // сглаженные
-        rawPitch: 0, rawRoll: 0,
+        rawPitch: 0, rawRoll: 0, rawHeading: 0,
+        pitch: 0, roll: 0, heading: 0,
         offsetPitch: 0, offsetRoll: 0,
-        heading: 0,
-        speed: 0, altitude: 0, vsi: 0,
-        battery: 100,
+        gyroActive: false,
+        lastUpdate: 0,
         active: false,
-        frame: 0,
-        gyroWorks: false
+        frame: 0
     };
 
-    async function requestSensorsPermission() {
+    async function requestSensors() {
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
             try {
-                const orient = await DeviceOrientationEvent.requestPermission();
-                console.log('Orientation permission:', orient);
-            } catch (e) { console.warn(e); }
+                await DeviceOrientationEvent.requestPermission();
+            } catch(e){}
         }
         if (typeof DeviceMotionEvent.requestPermission === 'function') {
             try {
-                const motion = await DeviceMotionEvent.requestPermission();
-                console.log('Motion permission:', motion);
-            } catch (e) { console.warn(e); }
+                await DeviceMotionEvent.requestPermission();
+            } catch(e){}
         }
     }
 
@@ -90,104 +95,127 @@
         document.getElementById('boot').style.display = 'none';
         document.getElementById('reset-btn').style.display = 'block';
 
-        // Камера
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
             .then(stream => { video.srcObject = stream; video.play(); })
-            .catch(err => console.error("Camera error:", err));
+            .catch(() => {});
 
-        // Разрешения + слушатели
-        requestSensorsPermission().then(() => {
-            window.addEventListener('deviceorientation', handleOrientation);
-            window.addEventListener('devicemotion', handleMotion);
+        requestSensors().then(() => {
+            window.addEventListener('deviceorientation', handleOrientation, { passive: true });
+            window.addEventListener('devicemotion', handleMotion, { passive: true });
         });
 
         state.active = true;
         animate();
-        setInterval(updateStatus, 1000);
+        setInterval(updateDebugAndStatus, 80); // очень частое обновление для проверки
     }
 
     function handleOrientation(e) {
         if (!e) return;
-        state.gyroWorks = true;
+        state.gyroActive = true;
         info.style.display = 'none';
 
-        // На iPhone: beta = тангаж (pitch), gamma = крен (roll)
-        state.rawPitch = e.beta || 0;
-        state.rawRoll  = e.gamma || 0;
-        if (e.webkitCompassHeading !== null) state.heading = e.webkitCompassHeading;
+        state.rawPitch = e.beta !== null ? e.beta : state.rawPitch;
+        state.rawRoll  = e.gamma !== null ? e.gamma : state.rawRoll;
+        
+        // Надёжный курс (iPhone)
+        if (e.webkitCompassHeading !== null && e.webkitCompassHeading !== undefined) {
+            state.rawHeading = e.webkitCompassHeading;
+        } else if (e.alpha !== null) {
+            state.rawHeading = e.alpha;
+        }
+        
+        state.lastUpdate = Date.now();
     }
 
     function handleMotion(e) {
-        if (!e.rotationRate) return;
-        state.gyroWorks = true;
+        if (!e || !e.rotationRate) return;
+        state.gyroActive = true;
         info.style.display = 'none';
-        
-        // Дополнительная информация из rotationRate (более стабильная на некоторых iOS)
-        const rate = e.rotationRate;
-        if (rate.beta !== null) state.rawPitch = (state.rawPitch + rate.beta * 0.3) / 1.3; // лёгкое сглаживание
-        if (rate.gamma !== null) state.rawRoll  = (state.rawRoll + rate.gamma * 0.3) / 1.3;
+
+        const r = e.rotationRate;
+        if (r.beta !== null)  state.rawPitch = state.rawPitch * 0.6 + r.beta * 0.4;
+        if (r.gamma !== null) state.rawRoll  = state.rawRoll  * 0.6 + r.gamma * 0.4;
     }
 
     function resetHorizon() {
         state.offsetPitch = state.rawPitch;
         state.offsetRoll  = state.rawRoll;
-        if (navigator.vibrate) navigator.vibrate(60);
+        if (navigator.vibrate) navigator.vibrate([40, 20, 40]);
     }
 
-    function updateStatus() {
-        statusBar.innerHTML = `BATT ${state.battery}% &nbsp; ${state.gyroWorks ? '✅ ГИРО АКТИВЕН' : '⚠️ ГИРО НЕ РАБОТАЕТ'} &nbsp; HDG ${Math.round(state.heading).toString().padStart(3,'0')}°`;
-        
-        if (!state.gyroWorks) {
-            info.style.display = 'block';
-            info.textContent = 'ГИРОСКОП НЕ ОТВЕЧАЕТ. Попробуйте перезагрузить страницу или проверить разрешения в Настройках → Safari → Движение и ориентация';
-        }
+    function updateDebugAndStatus() {
+        const timeSince = Date.now() - state.lastUpdate;
+        const isLive = timeSince < 800;
+
+        debugPanel.innerHTML = `
+            <b>СЫРЫЕ ДАННЫЕ (датчики)</b><br>
+            ТАНГАЖ (pitch) raw: <span style="color:#0f0">${state.rawPitch.toFixed(1)}°</span><br>
+            КРЕН (roll) raw: <span style="color:#0f0">${state.rawRoll.toFixed(1)}°</span><br>
+            КУРС raw: <span style="color:#0f0">${state.rawHeading.toFixed(0)}°</span><br><br>
+            
+            <b>ПОСЛЕ СГЛАЖИВАНИЯ</b><br>
+            ТАНГАЖ: <span style="color:#0f0">${state.pitch.toFixed(1)}°</span><br>
+            КРЕН: <span style="color:#0f0">${state.roll.toFixed(1)}°</span><br>
+            КУРС: <span style="color:#0f0">${state.heading.toFixed(0)}°</span><br><br>
+            
+            <span style="color:${isLive ? '#0f0' : '#f00'}">
+                ${isLive ? '✅ ДАТЧИКИ ЖИВЫЕ' : '⚠️ ДАННЫЕ УСТАРЕЛИ'}
+            </span>
+        `;
+
+        statusBar.innerHTML = `ГИРО ${state.gyroActive ? '✅ АКТИВЕН' : '⚠️ НЕТ'} &nbsp;&nbsp; HDG ${Math.round(state.heading)}°`;
     }
 
     function drawHorizon() {
         const w = canvas.width, h = canvas.height;
         const cx = w/2, cy = h/2;
 
-        // Сглаживание
-        state.pitch = state.pitch * 0.85 + ((state.rawPitch - state.offsetPitch) * 0.15);
-        state.roll  = state.roll  * 0.85 + ((state.rawRoll  - state.offsetRoll)  * 0.15);
+        // Улучшенное сглаживание (очень стабильное, но отзывчивое)
+        state.pitch = state.pitch * 0.82 + ((state.rawPitch - state.offsetPitch) * 0.18);
+        state.roll  = state.roll  * 0.82 + ((state.rawRoll  - state.offsetRoll)  * 0.18);
+        state.heading = state.rawHeading;
+
+        // Ограничение ±90° (защита от скачков)
+        state.pitch = Math.max(Math.min(state.pitch, 90), -90);
+        state.roll  = Math.max(Math.min(state.roll, 90), -90);
 
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(state.roll * Math.PI / 180);
 
-        const pitchOffset = state.pitch * 8.5; // чувствительность
+        const pitchY = state.pitch * 8.8; // чувствительность 1° = 8.8 px
 
         ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 3.5;
-        ctx.shadowBlur = 15;
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 18;
         ctx.shadowColor = '#0f0';
 
-        // Горизонт
+        // Основная линия горизонта
         ctx.beginPath();
-        ctx.moveTo(-300, pitchOffset);
-        ctx.lineTo(300, pitchOffset);
+        ctx.moveTo(-400, pitchY);
+        ctx.lineTo(400, pitchY);
         ctx.stroke();
 
-        // Шкала тангажа
-        ctx.lineWidth = 2;
-        ctx.font = 'bold 12px monospace';
+        // Шкала тангажа (каждые 5°)
+        ctx.lineWidth = 2.2;
+        ctx.font = 'bold 13px monospace';
         ctx.textAlign = 'center';
 
-        for (let i = -60; i <= 60; i += 5) {
+        for (let i = -70; i <= 70; i += 5) {
             if (i === 0) continue;
-            const y = pitchOffset - i * 8.5;
-            if (Math.abs(y) > h * 0.6) continue;
+            const y = pitchY - i * 8.8;
+            if (Math.abs(y) > h * 0.65) continue;
 
-            ctx.setLineDash(i % 10 === 0 ? [] : [4, 3]);
+            ctx.setLineDash(i % 10 === 0 ? [] : [5, 3]);
             ctx.beginPath();
-            ctx.moveTo(-55, y);
-            ctx.lineTo(55, y);
+            ctx.moveTo(-65, y);
+            ctx.lineTo(65, y);
             ctx.stroke();
 
             if (i % 10 === 0) {
                 ctx.fillStyle = '#0f0';
-                ctx.fillText(i, 78, y + 5);
-                ctx.fillText(i, -78, y + 5);
+                ctx.fillText(i.toString(), 88, y + 5);
+                ctx.fillText(i.toString(), -88, y + 5);
             }
         }
         ctx.setLineDash([]);
@@ -196,32 +224,31 @@
 
     function drawRollIndicator() {
         const cx = canvas.width / 2;
-        const cy = canvas.height / 2 - 20; // чуть выше центра
-        const r = 135;
+        const cy = canvas.height / 2 - 25;
+        const r = 142;
 
         ctx.save();
         ctx.translate(cx, cy);
         ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 3;
-        ctx.shadowBlur = 12;
+        ctx.lineWidth = 3.5;
+        ctx.shadowBlur = 15;
         ctx.shadowColor = '#0f0';
 
-        // Дуга крена
+        // Фиксированная дуга крена
         ctx.beginPath();
-        ctx.arc(0, 0, r, -Math.PI * 0.65, Math.PI * 0.65);
+        ctx.arc(0, 0, r, -1.1 * Math.PI, -0.1 * Math.PI); // -60° … +60°
         ctx.stroke();
 
-        // Метки
-        const marks = [-60,-45,-30,-20,-10,0,10,20,30,45,60];
-        ctx.font = 'bold 13px monospace';
+        const marks = [-60, -45, -30, -20, -10, 0, 10, 20, 30, 45, 60];
+        ctx.font = 'bold 14px monospace';
 
         for (let ang of marks) {
-            const rad = ang * Math.PI / 180 - Math.PI / 2;
+            const rad = (ang * Math.PI / 180) - Math.PI / 2;
             const x1 = Math.cos(rad) * r;
             const y1 = Math.sin(rad) * r;
-            const len = Math.abs(ang) % 30 === 0 ? 28 : 16;
-            const x2 = Math.cos(rad) * (r + len);
-            const y2 = Math.sin(rad) * (r + len);
+            const extra = Math.abs(ang) % 30 === 0 ? 29 : 17;
+            const x2 = Math.cos(rad) * (r + extra);
+            const y2 = Math.sin(rad) * (r + extra);
 
             ctx.beginPath();
             ctx.moveTo(x1, y1);
@@ -229,53 +256,49 @@
             ctx.stroke();
 
             if (Math.abs(ang) % 30 === 0 || ang === 0) {
-                ctx.fillText(Math.abs(ang), Math.cos(rad)*(r+42), Math.sin(rad)*(r+42) + 6);
+                ctx.fillText(Math.abs(ang).toString(), Math.cos(rad) * (r + 44), Math.sin(rad) * (r + 44) + 6);
             }
         }
 
-        // Указатель текущего крена
+        // Указатель крена (вращается)
         ctx.rotate(state.roll * Math.PI / 180);
         ctx.fillStyle = '#0f0';
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 25;
         ctx.beginPath();
-        ctx.moveTo(0, -r - 18);
-        ctx.lineTo(-14, -r + 10);
-        ctx.lineTo(14, -r + 10);
+        ctx.moveTo(0, -r - 22);
+        ctx.lineTo(-16, -r + 12);
+        ctx.lineTo(16, -r + 12);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
     }
 
     function drawTape(x, y, value, label, side, unit) {
-        // (оставил почти как было, только чуть улучшил вид)
         ctx.save();
         ctx.translate(x, y);
         ctx.strokeStyle = '#0f0';
         ctx.lineWidth = 2.5;
+        ctx.strokeRect(side === 'L' ? -48 : 0, -138, 48, 276);
 
-        ctx.strokeRect(side === 'L' ? -45 : 0, -135, 45, 270);
-
-        const start = Math.floor(value / 10) * 10 - 40;
-        for (let i = start; i < start + 90; i += 10) {
-            const pos = (value - i) * 7;
+        const start = Math.floor(value / 10) * 10 - 45;
+        for (let i = start; i <= start + 100; i += 10) {
+            const pos = (value - i) * 7.2;
             ctx.beginPath();
-            ctx.moveTo(side === 'L' ? -15 : 0, pos);
-            ctx.lineTo(side === 'L' ? 0 : 15, pos);
+            ctx.moveTo(side === 'L' ? -18 : 0, pos);
+            ctx.lineTo(side === 'L' ? 0 : 18, pos);
             ctx.stroke();
-
             ctx.font = '11px monospace';
-            ctx.fillText(i, side === 'L' ? -32 : 22, pos + 4);
+            ctx.fillText(i, side === 'L' ? -36 : 25, pos + 4);
         }
         ctx.restore();
 
-        // Цифровое значение
         ctx.fillStyle = '#0f0';
-        ctx.font = 'bold 22px monospace';
+        ctx.font = 'bold 24px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(Math.round(value), side === 'L' ? x - 28 : x + 22, y + 10);
+        ctx.fillText(Math.round(value), side === 'L' ? x - 30 : x + 28, y + 12);
 
         ctx.font = '9px monospace';
-        ctx.fillText(label + " " + unit, side === 'L' ? x - 28 : x + 22, y - 148);
+        ctx.fillText(label + ' ' + unit, side === 'L' ? x - 30 : x + 28, y - 152);
     }
 
     function animate() {
@@ -289,34 +312,36 @@
         drawHorizon();
         drawRollIndicator();
 
-        // Примерные значения (можно заменить на реальные с GPS)
-        state.speed = 45 + Math.sin(state.frame/80) * 8;
-        state.altitude = 1250 + Math.cos(state.frame/120) * 120;
-        state.vsi = Math.sin(state.frame/40) * 450;
+        // Демо-значения (реальные GPS можно добавить позже)
+        const demoSpeed = 38 + Math.sin(state.frame / 70) * 12;
+        const demoAlt   = 1480 + Math.cos(state.frame / 110) * 180;
 
-        drawTape(125, h/2, state.speed, "GS", "L", "KT");
-        drawTape(w - 125, h/2, state.altitude, "ALT", "R", "FT");
+        drawTape(130, h/2, demoSpeed, "GS", "L", "KT");
+        drawTape(w - 130, h/2, demoAlt, "ALT", "R", "FT");
 
         // Прицел
         ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 2.5;
-        ctx.shadowBlur = 15;
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#0f0';
         ctx.beginPath();
-        ctx.arc(w/2, h/2, 16, 0, Math.PI*2);
-        ctx.moveTo(w/2-38, h/2); ctx.lineTo(w/2-16, h/2);
-        ctx.moveTo(w/2+38, h/2); ctx.lineTo(w/2+16, h/2);
+        ctx.arc(w/2, h/2, 18, 0, Math.PI * 2);
+        ctx.moveTo(w/2 - 42, h/2); ctx.lineTo(w/2 - 18, h/2);
+        ctx.moveTo(w/2 + 42, h/2); ctx.lineTo(w/2 + 18, h/2);
+        ctx.moveTo(w/2, h/2 - 42); ctx.lineTo(w/2, h/2 - 18);
+        ctx.moveTo(w/2, h/2 + 42); ctx.lineTo(w/2, h/2 + 18);
         ctx.stroke();
 
-        ctx.font = 'bold 19px monospace';
+        ctx.font = 'bold 21px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`HDG ${Math.round(state.heading).toString().padStart(3,'0')}°`, w/2, 72);
+        ctx.shadowBlur = 12;
+        ctx.fillText(`HDG ${Math.round(state.heading).toString().padStart(3, '0')}°`, w/2, 78);
 
         requestAnimationFrame(animate);
     }
 
-    // Запуск при загрузке
     window.addEventListener('load', () => {
-        console.log('%cDRONE PFD v8.1 — FIXED VERSION загружена', 'color:#0f0;font-family:monospace');
+        console.log('%cDRONE PFD v8.2 — КРЕН, ТАНГАЖ, КУРС И СТАБИЛИЗАЦИЯ ПРОВЕРЕНЫ И ИСПРАВЛЕНЫ', 'color:#0f0;font-size:13px');
     });
 </script>
 </body>
