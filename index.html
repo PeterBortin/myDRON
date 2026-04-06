@@ -3,70 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tactical AR HUD</title>
+    <title>Retro Tactical AR HUD</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: monospace; }
-        
-        /* Слой камеры */
-        #videoBg {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; opacity: 0.4; filter: grayscale(1) brightness(0.8) contrast(1.2);
-            z-index: 1; display: none;
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #000; overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
         }
 
-        #hudCanvas { position: relative; display: block; width: 100vw; height: 100vh; z-index: 5; pointer-events: none; }
-
-        .crt {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-            background-size: 100% 2px, 2px 100%; z-index: 10; pointer-events: none;
+        /* Видеопоток с камеры */
+        #cameraStream {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            filter: grayscale(1) brightness(0.7) contrast(1.2) sepia(0.5) hue-rotate(80deg);
+            opacity: 0.6;
         }
 
-        /* Терминал */
-        #termOverlay {
-            position: fixed; top: 20px; left: 20px; right: 20px; bottom: 100px;
-            background: rgba(0, 20, 0, 0.9); border: 1px solid #0f0; color: #0f0;
-            padding: 15px; font-size: 12px; overflow-y: auto; display: none; z-index: 15;
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+            z-index: 10;
         }
 
-        .nav-bar {
-            position: fixed; bottom: 0; width: 100%; height: 80px;
-            background: rgba(0, 10, 0, 0.8); border-top: 1px solid #0f0;
-            display: flex; justify-content: space-around; align-items: center; z-index: 20;
+        #hudCanvas {
+            position: relative;
+            display: block;
+            width: 100vw; height: 100vh;
+            z-index: 5;
+            filter: brightness(1.2) contrast(1.1) drop-shadow(0 0 2px #0f0);
+            pointer-events: none;
+        }
+
+        .controls {
+            position: fixed; bottom: 20px; left: 50%;
+            transform: translateX(-50%); z-index: 20;
+            display: flex; gap: 10px;
         }
 
         .btn {
-            background: transparent; color: #0f0; border: 1px solid #0f0;
-            padding: 12px 20px; text-transform: uppercase; font-weight: bold;
-            box-shadow: 0 0 5px #0f0; cursor: pointer;
+            background: rgba(0, 40, 0, 0.7);
+            color: #0f0; border: 1px solid #0f0;
+            padding: 12px; text-transform: uppercase;
+            font-size: 10px; cursor: pointer;
+            backdrop-filter: blur(5px);
         }
-        .btn:active { background: #0f0; color: #000; }
+
+        /* Оверлей для запроса разрешений (нужен для iOS) */
+        #startOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            color: #0f0; text-align: center;
+        }
     </style>
 </head>
 <body>
-    <video id="videoBg" autoplay playsinline></video>
-    <div class="crt"></div>
-    <canvas id="hudCanvas"></canvas>
-    
-    <div id="termOverlay">
-        <div id="termContent">> SYSTEM BOOT...<br>> INITIALIZING SENSORS...<br></div>
+
+    <div id="startOverlay">
+        <h2>TACTICAL HUD OS v4.0</h2>
+        <p>ТРЕБУЕТСЯ ДОСТУП К СЕНСОРАМ</p>
+        <button class="btn" style="font-size: 18px; padding: 20px 40px;" onclick="initSystems()">Инициализация</button>
     </div>
 
-    <div class="nav-bar">
-        <button class="btn" onclick="toggleTerminal()">Terminal</button>
-        <button class="btn" onclick="initSensors()">Sensors</button>
+    <video id="cameraStream" autoplay playsinline></video>
+    <div class="crt-overlay"></div>
+    <canvas id="hudCanvas"></canvas>
+
+    <div class="controls">
+        <button class="btn" onclick="toggleAlert()">Alert</button>
+        <button class="btn" onclick="toggleCamera()">Cam</button>
+        <button class="btn" onclick="resetSim()">Reset</button>
     </div>
 
     <script>
         const canvas = document.getElementById('hudCanvas');
         const ctx = canvas.getContext('2d');
-        const video = document.getElementById('videoBg');
-        const term = document.getElementById('termOverlay');
-        const termOut = document.getElementById('termContent');
+        const video = document.getElementById('cameraStream');
+        const startOverlay = document.getElementById('startOverlay');
 
         let width, height;
-        let pitch = 0, roll = 0, yaw = 0;
-        let sensorsActive = false;
+        let frame = 0;
+        let pitch = 0, roll = 0;
+        let speed = 126, altitude = 7820;
+        let alertMode = false;
+        let useRealSensors = false;
 
         function resize() {
             width = canvas.width = window.innerWidth;
@@ -75,95 +101,176 @@
         window.addEventListener('resize', resize);
         resize();
 
-        function log(msg) {
-            termOut.innerHTML += `> ${msg}<br>`;
-            term.scrollTop = term.scrollHeight;
-        }
+        // 1. Инициализация камеры и гироскопа
+        async function initSystems() {
+            startOverlay.style.display = 'none';
 
-        function toggleTerminal() {
-            term.style.display = term.style.display === 'block' ? 'none' : 'block';
-        }
-
-        // Инициализация камеры и акселерометра
-        async function initSensors() {
-            log("REQUESTING SENSOR ACCESS...");
-            
-            // 1. Камера
+            // Запрос камеры
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "environment" }, 
                     audio: false 
                 });
                 video.srcObject = stream;
-                video.style.display = 'block';
-                log("CAMERA: CONNECTED");
-            } catch (e) { log("CAMERA: FAILED - " + e.message); }
-
-            // 2. Акселерометр/Гироскоп (iOS требует разрешения)
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(state => {
-                        if (state === 'granted') window.addEventListener('deviceorientation', handleMotion);
-                    });
-            } else {
-                window.addEventListener('deviceorientation', handleMotion);
+            } catch (err) {
+                console.error("Ошибка камеры:", err);
             }
-            sensorsActive = true;
-            log("GYRO: CALIBRATED");
+
+            // Запрос гироскопа (iOS требует подтверждения)
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        useRealSensors = true;
+                    }
+                } catch (err) { console.error(err); }
+            } else {
+                window.addEventListener('deviceorientation', handleOrientation);
+                useRealSensors = true;
+            }
         }
 
-        function handleMotion(e) {
-            // Адаптация углов под HUD
-            roll = e.gamma;  // Наклон влево/вправо
-            pitch = e.beta - 45; // Наклон вперед/назад (смещение для удобства чтения)
+        function handleOrientation(event) {
+            // beta: -180 до 180 (вперед/назад), gamma: -90 до 90 (влево/вправо)
+            roll = event.gamma; 
+            pitch = event.beta - 45; // Смещение на 45 градусов для удобного хвата
         }
 
-        function drawHUD() {
-            ctx.clearRect(0, 0, width, height);
+        function toggleCamera() {
+            video.style.display = video.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function updateData() {
+            frame++;
+            if (!useRealSensors) {
+                pitch = Math.sin(frame * 0.01) * 10;
+                roll = Math.cos(frame * 0.02) * 5;
+            }
+            speed += (Math.random() - 0.5) * 0.2;
+            altitude += (Math.random() - 0.4) * 1;
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = 'rgba(0, 255, 0, 0.15)';
+            ctx.lineWidth = 1;
+            for(let i = 0; i < width; i += 40) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, height); ctx.stroke();
+            }
+            for(let i = 0; i < height; i += 40) {
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(width, i); ctx.stroke();
+            }
+        }
+
+        function drawTape(x, y, val, alignRight = false) {
+            const h = 240, w = 60;
             ctx.strokeStyle = '#0f0';
             ctx.fillStyle = '#0f0';
-            ctx.lineWidth = 2;
-
-            // Сетка прицела (центр)
+            ctx.lineWidth = 1.5;
+            
             ctx.save();
-            ctx.translate(width/2, height/2);
-            ctx.rotate(roll * Math.PI / 180);
-            ctx.translate(0, pitch * 4);
-
-            // Линии горизонта
-            ctx.beginPath();
-            ctx.moveTo(-100, 0); ctx.lineTo(-40, 0);
-            ctx.moveTo(40, 0); ctx.lineTo(100, 0);
-            ctx.stroke();
-
-            // Тангаж (шкалы)
-            for(let i=-3; i<=3; i++) {
-                if(i===0) continue;
-                let y = i * 50;
-                ctx.globalAlpha = 0.4;
+            ctx.translate(x, y - h/2);
+            ctx.strokeRect(0, 0, w, h);
+            ctx.clip();
+            
+            for(let i = -8; i <= 8; i++) {
+                let currVal = Math.floor(val/20)*20 + (i * 20);
+                let ty = h/2 - (i * 40) + (val % 20) * 2;
                 ctx.beginPath();
-                ctx.moveTo(-30, y); ctx.lineTo(30, y);
+                ctx.moveTo(alignRight ? 0 : w, ty);
+                ctx.lineTo(alignRight ? 15 : w - 15, ty);
                 ctx.stroke();
-                ctx.fillText(i*10, 35, y+5);
-                ctx.globalAlpha = 1;
+                ctx.font = '12px monospace';
+                ctx.fillText(currVal, alignRight ? 20 : 5, ty + 5);
             }
             ctx.restore();
-
-            // Инфо-панели
-            ctx.font = '10px monospace';
-            ctx.fillText(`RLL: ${Math.round(roll)}°`, 20, height - 100);
-            ctx.fillText(`PTCH: ${Math.round(pitch)}°`, 20, height - 115);
             
-            // Рамка сканера (статичная)
-            ctx.strokeRect(width/2 - 60, height/2 - 60, 120, 120);
-            ctx.beginPath();
-            ctx.moveTo(width/2, height/2 - 70); ctx.lineTo(width/2, height/2 - 50);
-            ctx.stroke();
-
-            requestAnimationFrame(drawHUD);
+            // Текущее значение
+            ctx.fillStyle = 'rgba(0, 40, 0, 0.8)';
+            ctx.fillRect(x - 5, y - 15, w + 10, 30);
+            ctx.strokeStyle = '#0f0';
+            ctx.strokeRect(x - 5, y - 15, w + 10, 30);
+            ctx.fillStyle = '#0f0';
+            ctx.font = 'bold 14px monospace';
+            ctx.fillText(Math.round(val), x + 5, y + 5);
         }
 
-        drawHUD();
+        function drawHorizon() {
+            ctx.save();
+            ctx.translate(width / 2, height / 2);
+            ctx.rotate(roll * Math.PI / 180);
+            ctx.translate(0, pitch * 6);
+
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 2;
+
+            // Центральный визир
+            ctx.beginPath();
+            ctx.moveTo(-40, 0); ctx.lineTo(-15, 0); ctx.lineTo(-15, 10);
+            ctx.moveTo(40, 0); ctx.lineTo(15, 0); ctx.lineTo(15, 10);
+            ctx.stroke();
+
+            // Линии тангажа
+            for(let i = -5; i <= 5; i++) {
+                if(i === 0) continue;
+                let ty = -i * 50;
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath();
+                ctx.moveTo(-30, ty); ctx.lineTo(30, ty);
+                ctx.stroke();
+                ctx.font = '10px monospace';
+                ctx.fillText(i * 10, 35, ty + 4);
+                ctx.globalAlpha = 1.0;
+            }
+            ctx.restore();
+        }
+
+        function drawTerminalInfo() {
+            ctx.fillStyle = '#0f0';
+            ctx.font = '12px monospace';
+            const now = new Date();
+            ctx.fillText(now.toLocaleTimeString() + " | SENSOR_DATA", 20, 30);
+            ctx.fillText(`PITCH: ${pitch.toFixed(1)}°`, 20, 50);
+            ctx.fillText(`ROLL: ${roll.toFixed(1)}°`, 20, 65);
+            
+            // Мини-график активности
+            for(let i = 0; i < 5; i++) {
+                let barH = 15 + Math.sin(frame * 0.1 + i) * 10;
+                ctx.fillRect(width - 150 + (i * 25), 20, 15, barH);
+            }
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, width, height);
+
+            if(alertMode && frame % 40 < 20) {
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
+                ctx.fillRect(0, 0, width, height);
+                ctx.fillStyle = '#f00';
+                ctx.font = 'bold 20px monospace';
+                ctx.fillText("WARNING: SENSOR OVERLOAD", width/2 - 120, 100);
+            }
+
+            drawGrid();
+            updateData();
+            drawHorizon();
+            
+            drawTape(20, height / 2, speed);
+            drawTape(width - 80, height / 2, altitude, true);
+            
+            drawTerminalInfo();
+
+            // Эффект сканирующей линии
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.03)';
+            ctx.fillRect(0, (frame * 3) % height, width, 5);
+
+            requestAnimationFrame(render);
+        }
+
+        function toggleAlert() { alertMode = !alertMode; }
+        function resetSim() { speed = 126; altitude = 7820; pitch = 0; roll = 0; }
+
+        render();
     </script>
 </body>
 </html>
