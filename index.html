@@ -1,254 +1,928 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="uk">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DRONE PFD v8.2 — FIXED</title>
-    <style>
-        :root { --color: #00ff41; }
-        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
-        body { background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: var(--color); }
-        
-        #cam { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; 
-               filter: brightness(0.6) contrast(1.4) sepia(0.2) hue-rotate(88deg); }
-        
-        #canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
-        
-        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 15;
-                     background: linear-gradient(rgba(18,16,16,0) 50%, rgba(0,255,0,0.05) 50%),
-                                 linear-gradient(90deg, rgba(255,0,0,0.02), rgba(0,255,0,0.01), rgba(0,0,255,0.02));
-                     background-size: 100% 4px, 3px 100%; pointer-events: none; }
-        
-        .status-bar {
-            position: fixed; top: 12px; left: 20px; z-index: 200; font-size: 13px;
-            text-shadow: 0 0 8px var(--color);
-        }
-        
-        #debug {
-            position: fixed; bottom: 120px; left: 20px; z-index: 200; 
-            background: rgba(0,0,0,0.85); padding: 10px 14px; border: 1px solid #0f0;
-            font-size: 11px; line-height: 1.4; display: block; width: 220px;
-        }
-        
-        #info { 
-            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.8); padding: 10px 20px; border: 1px solid var(--color);
-            font-size: 13px; z-index: 200; display: none; text-align: center;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#000000">
+<title>DRONE PFD v9.0</title>
+<!--
+  DRONE PFD v9.0 — мобільний пілотажний дисплей поверх камери (ландшафт, FPV-стиль)
+  ───────────────────────────────────────────────────────────────────────────────
+  АРХІТЕКТУРА: TelemetrySource → State → Renderer.
+    Рендер малює тільки зі стейту S (pitch/roll/hdg/alt/spd/slip). Джерела зараз:
+    PhoneIMU (deviceorientation[absolute] + devicemotion), PhoneGPS (watchPosition),
+    Demo (синтетика). Пізніше сюди підключається MSP/CRSF (Web Serial / WebSocket)
+    без жодних змін у рендері.
+  МАТЕМАТИКА АТИТЮДУ: alpha/beta/gamma → матриця повороту (W3C ZXY) → pitch/roll
+    відносно осі камери (−Z пристрою). Сирі beta/gamma НЕ використовуються напряму —
+    саме це давало gimbal lock при вертикальному телефоні (β≈90°). Перевірено
+    синтетичним харнесом: attitude-harness.mjs (21/21 ✓).
+  КОНСТАНТИ ДЛЯ ПОЛЬОВОГО ПІДСТРОЮВАННЯ — одразу нижче в <script>:
+    SCREEN_ANGLE_FLIP — якщо на конкретному пристрої крен у ландшафті дзеркальний;
+    IOS_HDG_CORR      — таблиця корекції webkitCompassHeading за кутом екрана.
+  Нуль зовнішніх залежностей: працює офлайн, шрифти — системний mono-стек.
+-->
+<style>
+:root{
+  --g:#00ff41; --g-dim:rgba(0,255,65,.62); --g-faint:rgba(0,255,65,.18);
+  --amb:#ffb000; --red:#ff3b30; --bg:#000;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace;
+  --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
+  --sat:env(safe-area-inset-top,0px);  --sab:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html,body{height:100%}
+body{background:var(--bg);overflow:hidden;font-family:var(--mono);color:var(--g);touch-action:manipulation}
+
+#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;
+  filter:brightness(.62) contrast(1.38) sepia(.22) hue-rotate(86deg) saturate(1.25)}
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none}
+.scanlines{position:fixed;inset:0;z-index:15;pointer-events:none;
+  background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,255,65,.045) 50%),
+             linear-gradient(90deg,rgba(255,0,0,.02),rgba(0,255,65,.012),rgba(0,0,255,.02));
+  background-size:100% 4px,3px 100%}
+.vignette{position:fixed;inset:0;z-index:16;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 56%,rgba(0,0,0,.52) 100%)}
+
+#statusbar{position:fixed;top:calc(var(--sat) + 6px);left:calc(var(--sal) + 12px);
+  z-index:40;font-size:11px;letter-spacing:.08em;color:var(--g-dim);
+  text-shadow:0 0 6px rgba(0,255,65,.5);pointer-events:none;white-space:nowrap}
+
+.chips{position:fixed;bottom:calc(var(--sab) + 10px);left:calc(var(--sal) + 12px);
+  z-index:40;display:flex;gap:8px;align-items:center}
+.chip{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--g);
+  background:rgba(0,20,6,.72);border:1px solid var(--g-dim);padding:9px 12px;
+  min-height:40px;display:flex;align-items:center;border-radius:2px}
+button.chip{cursor:pointer;pointer-events:auto}
+button.chip:active{background:rgba(0,255,65,.18)}
+.chip.amb{color:var(--amb);border-color:var(--amb)}
+.chip.red{color:var(--red);border-color:var(--red)}
+
+.btns{position:fixed;bottom:calc(var(--sab) + 10px);right:calc(var(--sar) + 12px);
+  z-index:40;display:flex;gap:8px}
+.btn{font-family:var(--mono);font-size:13px;letter-spacing:.08em;color:var(--g);
+  background:rgba(0,20,6,.72);border:1px solid var(--g);padding:0 16px;
+  min-height:46px;min-width:46px;cursor:pointer;border-radius:2px}
+.btn:active{background:rgba(0,255,65,.22)}
+
+#dbgBtn{position:fixed;top:calc(var(--sat) + 6px);right:calc(var(--sar) + 12px);
+  z-index:40;font-family:var(--mono);font-size:10px;color:var(--g-dim);
+  background:transparent;border:1px solid var(--g-faint);padding:6px 9px;cursor:pointer}
+#debug{position:fixed;top:calc(var(--sat) + 36px);right:calc(var(--sar) + 12px);
+  z-index:41;display:none;background:rgba(0,0,0,.88);border:1px solid var(--g-dim);
+  padding:9px 11px;font-size:10px;line-height:1.55;color:var(--g);
+  min-width:230px;white-space:pre;pointer-events:none}
+
+#toast{position:fixed;bottom:calc(var(--sab) + 66px);left:50%;transform:translateX(-50%);
+  z-index:60;background:rgba(0,0,0,.85);border:1px solid var(--g);color:var(--g);
+  font-size:12px;letter-spacing:.06em;padding:9px 15px;opacity:0;
+  transition:opacity .18s;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1}
+
+/* ── поворот у ландшафт ── */
+#rotate{position:fixed;inset:0;z-index:250;display:none;background:rgba(0,0,0,.93);
+  align-items:center;justify-content:center;flex-direction:column;gap:22px;text-align:center}
+@media (orientation:portrait){ body.booted #rotate{display:flex} }
+.phone{width:46px;height:78px;border:2.5px solid var(--g);border-radius:7px;position:relative;
+  animation:rot 2.2s ease-in-out infinite}
+.phone::after{content:"";position:absolute;bottom:5px;left:50%;transform:translateX(-50%);
+  width:14px;height:2.5px;background:var(--g)}
+@keyframes rot{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(90deg)}}
+#rotate p{font-size:14px;letter-spacing:.2em}
+
+/* ── boot ── */
+#boot{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.96);
+  display:flex;align-items:center;justify-content:center;transition:opacity .45s}
+#boot.off{opacity:0;pointer-events:none}
+.bframe{border:2px solid var(--g);background:#000;padding:26px 30px;max-width:min(92vw,560px);
+  width:100%;box-shadow:0 0 34px rgba(0,255,65,.22),inset 0 0 24px rgba(0,255,65,.05)}
+.btitle{font-size:24px;letter-spacing:.28em;text-shadow:0 0 12px rgba(0,255,65,.8)}
+.btitle small{font-size:12px;letter-spacing:.14em;color:var(--g-dim);margin-left:8px}
+.bsub{margin-top:6px;font-size:11px;letter-spacing:.22em;color:var(--g-dim)}
+#blog{margin-top:16px;font-size:12.5px;line-height:1.75;min-height:118px;color:var(--g)}
+#blog .bn{color:var(--g-dim)}
+#blog .ok{color:var(--g)} #blog .warn{color:var(--amb)} #blog .err{color:var(--red)}
+#armBtn{margin-top:18px;width:100%;background:var(--g);color:#000;border:none;
+  padding:15px 0;font-family:var(--mono);font-weight:700;font-size:17px;
+  letter-spacing:.3em;cursor:pointer}
+#armBtn:disabled{opacity:.35}
+.bhint{margin-top:10px;font-size:10.5px;color:var(--g-dim);letter-spacing:.05em}
+
+@media (prefers-reduced-motion:reduce){
+  .phone{animation:none;transform:rotate(90deg)}
+}
+</style>
 </head>
 <body>
 
 <video id="cam" autoplay playsinline muted webkit-playsinline></video>
+<canvas id="hud"></canvas>
 <div class="scanlines"></div>
-<canvas id="canvas"></canvas>
+<div class="vignette"></div>
 
-<div class="status-bar" id="status-bar">ПРОВЕРКА ДАТЧИКОВ...</div>
+<div id="statusbar">PFD v9.0</div>
+
+<div class="chips">
+  <button class="chip" id="srcChip">ДЖЕРЕЛО: GPS</button>
+  <span class="chip" id="gpsChip">GPS: —</span>
+</div>
+
+<div class="btns">
+  <button class="btn" id="trimBtn" title="тап — виставити трим, довгий тап — скинути">ТРИМ</button>
+  <button class="btn" id="fsBtn">ЕКРАН</button>
+</div>
+
+<button id="dbgBtn">DBG</button>
 <div id="debug"></div>
-<div id="info">ГИРОСКОП НЕ ОТВЕЧАЕТ</div>
+<div id="toast"></div>
 
-<button id="reset-btn" style="position:fixed;bottom:30px;right:30px;z-index:200;background:rgba(0,255,65,0.1);border:1px solid #0f0;color:#0f0;padding:14px 24px;font-size:14px;cursor:pointer;display:none;" onclick="resetHorizon()">
-    ЦЕНТР ГОРИЗОНТА + КАЛИБРОВКА
-</button>
+<div id="rotate">
+  <div class="phone"></div>
+  <p>ПОВЕРНИ В ЛАНДШАФТ</p>
+</div>
 
-<div id="boot" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:300;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;">
-    <div style="background:#000;border:2px solid #0f0;padding:40px 30px;text-align:center;max-width:92%;">
-        <h1 style="font-size:26px;letter-spacing:4px;margin-bottom:10px;">DRONE PFD v8.2</h1>
-        <p style="margin-bottom:20px;font-size:14px;">ЛЕВЫЙ: КРЕН | ПРАВЫЙ: ВЫСОТА</p>
-        <p style="font-size:12px;margin-bottom:25px;">Установите телефон ровно относительно дрона</p>
-        <button onclick="boot()" style="background:#0f0;color:#000;border:none;padding:18px 60px;font-weight:bold;font-size:17px;cursor:pointer;">ЗАПУСТИТЬ</button>
-    </div>
+<div id="boot">
+  <div class="bframe">
+    <div class="btitle">DRONE PFD <small>v9.0</small></div>
+    <div class="bsub">ЛАНДШАФТ · КАМЕРА · ГІРОСКОП · GPS</div>
+    <pre id="blog"></pre>
+    <button id="armBtn">АРМ</button>
+    <div class="bhint">iOS спитає дозвіл на датчики руху — треба дозволити. Трим: тап = центр, довгий тап = скинути.</div>
+  </div>
 </div>
 
 <script>
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const video = document.getElementById('cam');
-    const statusBar = document.getElementById('status-bar');
-    const debugPanel = document.getElementById('debug');
-    const info = document.getElementById('info');
+'use strict';
+/* ═══════════════ КОНФІГ (польове підстроювання) ═══════════════ */
+// Якщо на конкретному пристрої в ландшафті крен дзеркальний — постав true:
+const SCREEN_ANGLE_FLIP = false;
+// Корекція webkitCompassHeading (iOS) за ефективним кутом екрана:
+const IOS_HDG_CORR = { 0: 0, 90: 90, 180: 180, 270: -90 };
 
-    let state = {
-        rawPitch: 0, rawRoll: 0, rawHeading: 0,
-        pitch: 0, roll: 0, heading: 0,
-        offsetPitch: 0, offsetRoll: 0,
-        gyroActive: false,
-        lastUpdate: 0,
-        active: false,
-        frame: 0
-    };
+const TAU_ATT = 0.08, TAU_HDG = 0.25, TAU_SLIP = 0.30, TAU_TAPE = 0.35;
+const G = '#00ff41', GDIM = 'rgba(0,255,65,.62)', GFAINT = 'rgba(0,255,65,.18)',
+      AMB = '#ffb000', RED = '#ff3b30';
+const MONO = 'ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace';
+const CARD = { 0: 'Пн', 90: 'Сх', 180: 'Пд', 270: 'Зх' };
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    async function requestSensors() {
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            try { await DeviceOrientationEvent.requestPermission(); } catch(e){}
-        }
-        if (typeof DeviceMotionEvent.requestPermission === 'function') {
-            try { await DeviceMotionEvent.requestPermission(); } catch(e){}
-        }
+/* ═══════════════ МАТЕМАТИКА АТИТЮДУ (перевірено attitude-harness.mjs, 21/21) ═══════════════ */
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const clamp1 = v => Math.max(-1, Math.min(1, v));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// W3C deviceorientation: R = Rz(alpha)·Rx(beta)·Ry(gamma), device → earth
+// Earth: X=схід, Y=північ, Z=вгору. Device: X=праворуч, Y=верх екрана, Z=на користувача.
+function rotZXY(alphaDeg, betaDeg, gammaDeg) {
+  const a = alphaDeg * D2R, b = betaDeg * D2R, g = gammaDeg * D2R;
+  const cA = Math.cos(a), sA = Math.sin(a);
+  const cB = Math.cos(b), sB = Math.sin(b);
+  const cG = Math.cos(g), sG = Math.sin(g);
+  return [
+    cA * cG - sA * sB * sG, -sA * cB, cA * sG + sA * sB * cG,
+    sA * cG + cA * sB * sG,  cA * cB, sA * sG - cA * sB * cG,
+    -cB * sG,                sB,      cB * cG
+  ];
+}
+// Атитюд камери (вісь −Z пристрою). pitch: + = камера вище горизонту.
+// roll: + = крен праворуч (правий край екрана вниз). Сирі beta/gamma не використовуються.
+function attitudeFromMatrix(m, screenAngleDeg) {
+  const fx = -m[2], fy = -m[5], fz = -m[8];
+  const pitch = Math.asin(clamp1(fz)) * R2D;
+  const A = (screenAngleDeg || 0) * D2R;
+  const sx = Math.cos(A), sy = -Math.sin(A);
+  const rx = m[0] * sx + m[1] * sy;
+  const ry = m[3] * sx + m[4] * sy;
+  const rz = m[6] * sx + m[7] * sy;
+  const hl = Math.hypot(fy, fx);
+  if (hl < 1e-6) return { pitch, roll: null };            // погляд строго вертикально
+  const hx = fy / hl, hy = -fx / hl;
+  const cosr = hx * rx + hy * ry;
+  const sinr = (hy * rz) * fx + (-hx * rz) * fy + (hx * ry - hy * rx) * fz;
+  return { pitch, roll: Math.atan2(sinr, cosr) * R2D };
+}
+function attitudeFromEuler(a, b, g, ang) { return attitudeFromMatrix(rotZXY(a || 0, b || 0, g || 0), ang); }
+// Курс погляду камери 0..360 (0=Пн). Fallback на вісь "верх пристрою" при вертикальному погляді.
+function headingFromMatrix(m) {
+  let ex = -m[2], ny = -m[5];
+  if (Math.hypot(ex, ny) < 0.35) { ex = m[1]; ny = m[4]; }
+  if (Math.hypot(ex, ny) < 1e-6) return null;
+  return (Math.atan2(ex, ny) * R2D + 360) % 360;
+}
+
+/* ═══════════════ СТЕЙТ (те, що малює рендер) ═══════════════ */
+function mkChan() { return { raw: null, ts: 0, val: null, trend: 0 }; }
+function setRaw(ch, v, tSec) {
+  if (v == null || !isFinite(v)) return;
+  if (ch.raw != null && tSec > ch.ts) {
+    const dt = tSec - ch.ts;
+    const inst = (v - ch.raw) / dt;
+    ch.trend += (inst - ch.trend) * (1 - Math.exp(-dt / 1.0));
+  }
+  ch.raw = v; ch.ts = tSec;
+  if (ch.val == null) ch.val = v;
+}
+function resetChan(ch) { ch.raw = null; ch.val = null; ch.trend = 0; ch.ts = 0; }
+
+const S = {
+  booted: false, armTs: 0, everOri: false,
+  oriRel: { a: null, b: null, g: null, ts: 0 },
+  oriAbs: { a: null, b: null, g: null, ts: 0 },
+  hasAbs: false, webkitHdg: null, webkitTs: 0,
+  _hzC: 0, _hzT: 0, oriHz: 0,
+  mot: { x: 0, y: 0, z: 0, ts: 0, sign: 1, cal: 0, calN: 0 },
+  gps: { acc: null, ts: 0, denied: false, started: false },
+  att: { p: 0, r: 0, ok: false, demo: false },
+  hdg: { cont: 0, val: 0, mode: '—', ok: false },
+  spd: mkChan(), alt: mkChan(),
+  slip: 0, slipOk: false,
+  src: (localStorage.getItem('pfd.src') === 'DEMO') ? 'DEMO' : 'GPS',
+  trimP: parseFloat(localStorage.getItem('pfd.trimP')) || 0,
+  trimR: parseFloat(localStorage.getItem('pfd.trimR')) || 0,
+  camOk: false, fps: 0,
+};
+
+/* ═══════════════ DOM ═══════════════ */
+const $ = id => document.getElementById(id);
+const cv = $('hud'), ctx = cv.getContext('2d');
+const video = $('cam'), statusEl = $('statusbar'), debugEl = $('debug');
+const srcChip = $('srcChip'), gpsChip = $('gpsChip'), toastEl = $('toast');
+
+let toastT = null;
+function toast(msg) {
+  toastEl.textContent = msg; toastEl.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 2000);
+}
+function vib(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ═══════════════ ДЖЕРЕЛА: PhoneIMU ═══════════════ */
+function effAngle() {
+  let a = (screen.orientation && typeof screen.orientation.angle === 'number')
+    ? screen.orientation.angle
+    : (typeof window.orientation === 'number' ? (window.orientation + 360) % 360 : 0);
+  a = ((Math.round(a) % 360) + 360) % 360;
+  return SCREEN_ANGLE_FLIP ? (360 - a) % 360 : a;
+}
+function onOri(e, isAbs) {
+  const slot = isAbs ? S.oriAbs : S.oriRel;
+  slot.a = e.alpha; slot.b = e.beta; slot.g = e.gamma; slot.ts = performance.now();
+  if (e.beta != null || e.gamma != null) S.everOri = true;
+  if (isAbs && e.alpha != null) S.hasAbs = true;
+  if (!isAbs && e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)) {
+    S.webkitHdg = e.webkitCompassHeading; S.webkitTs = slot.ts;
+  }
+  S._hzC++;
+}
+function onMotion(e) {
+  const g = e.accelerationIncludingGravity;
+  if (!g || g.x == null) return;
+  const m = S.mot;
+  m.x = g.x; m.y = g.y; m.z = g.z; m.ts = performance.now();
+  // Автокалібрування знака (iOS та Android мають різні конвенції accelIncludingGravity):
+  // очікувана реакція опори = +g уздовж "верху світу" в СК пристрою.
+  const o = freshOri();
+  if (o && m.calN < 80) {
+    const R = rotZXY(0, o.b || 0, o.g || 0);
+    const d = g.x * R[6] + g.y * R[7] + g.z * R[8];
+    if (Math.abs(d) > 4) {
+      m.cal += Math.sign(d); m.calN++;
+      if (m.calN >= 12) m.sign = m.cal >= 0 ? 1 : -1;
     }
+  }
+}
+function addSensorListeners() {
+  window.addEventListener('deviceorientation', e => onOri(e, false), { passive: true });
+  window.addEventListener('deviceorientationabsolute', e => onOri(e, true), { passive: true });
+  window.addEventListener('devicemotion', onMotion, { passive: true });
+}
+function freshOri() {
+  const now = performance.now();
+  if (now - S.oriRel.ts < 800 && S.oriRel.b != null) return S.oriRel;
+  if (now - S.oriAbs.ts < 800 && S.oriAbs.b != null) return S.oriAbs;
+  return null;
+}
 
-    function boot() {
-        document.getElementById('boot').style.display = 'none';
-        document.getElementById('reset-btn').style.display = 'block';
-
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(stream => { video.srcObject = stream; video.play(); })
-            .catch(() => {});
-
-        requestSensors().then(() => {
-            window.addEventListener('deviceorientation', handleOrientation, { passive: true });
-        });
-
-        state.active = true;
-        animate();
-        setInterval(updateDebugAndStatus, 100);
+/* ═══════════════ ДЖЕРЕЛА: PhoneGPS + Demo ═══════════════ */
+function gpsFresh() { return !S.gps.denied && (performance.now() - S.gps.ts < 4000) && S.gps.acc != null && S.gps.acc < 150; }
+function startGPS() {
+  if (S.gps.started || !('geolocation' in navigator)) return;
+  S.gps.started = true;
+  navigator.geolocation.watchPosition(p => {
+    const c = p.coords, t = performance.now() / 1000;
+    S.gps.acc = c.accuracy; S.gps.ts = performance.now(); S.gps.denied = false;
+    if (S.src === 'GPS') {
+      setRaw(S.alt, c.altitude, t);
+      setRaw(S.spd, c.speed != null ? c.speed * 3.6 : null, t);
     }
+  }, err => { if (err && err.code === 1) S.gps.denied = true; },
+  { enableHighAccuracy: true, maximumAge: 500, timeout: 15000 });
+}
+function feedDemoTapes(tSec) {
+  setRaw(S.alt, 118 + 42 * Math.sin(tSec / 9) + 6 * Math.sin(tSec / 2.3), tSec);
+  setRaw(S.spd, Math.max(0, 47 + 26 * Math.sin(tSec / 6.1) + 3 * Math.sin(tSec / 1.7)), tSec);
+}
 
-    function handleOrientation(e) {
-        if (!e) return;
-        state.gyroActive = true;
-        info.style.display = 'none';
+/* ═══════════════ ЛЕЙАУТ + КАНВАС ═══════════════ */
+let W = 0, H = 0, dpr = 1, L = null;
+const SA = { l: 0, r: 0, t: 0, b: 0 };
+const st = document.createElement('canvas');
+const stx = st.getContext('2d');
 
-        // Стабилизированные сырые данные
-        state.rawPitch = e.beta || 0;
-        state.rawRoll  = e.gamma || 0;
-        
-        if (e.webkitCompassHeading !== undefined) {
-            state.rawHeading = e.webkitCompassHeading;
-        } else {
-            state.rawHeading = e.alpha || 0;
-        }
-        
-        state.lastUpdate = Date.now();
+function cssPx(v) { const n = parseFloat(v); return isFinite(n) ? n : 0; }
+function readSafe() {
+  const cs = getComputedStyle(document.documentElement);
+  SA.l = cssPx(cs.getPropertyValue('--sal'));
+  SA.r = cssPx(cs.getPropertyValue('--sar'));
+  SA.t = cssPx(cs.getPropertyValue('--sat'));
+  SA.b = cssPx(cs.getPropertyValue('--sab'));
+}
+function computeLayout() {
+  const m = Math.min(W, H);
+  const inL = Math.max(SA.l, 12), inR = Math.max(SA.r, 12), inT = Math.max(SA.t, 8);
+  const tapeW = 56;
+  const cy = H * 0.55;
+  const L2 = {
+    m, cx: W / 2, cy,
+    ppd: m / 42,
+    ladW: Math.min(m * 0.52, W * 0.42), ladH: m * 0.5,
+    bankR: m * 0.36,
+    hdgY: inT + 22, hdgW: Math.min(W * 0.42, 540), hdgH: 22,
+    tapeW, tapeH: Math.min(m * 0.6, H - 165),
+    spdX: inL + 10,
+    altX: W - inR - 10 - tapeW,
+  };
+  const ax0 = L2.spdX + tapeW + 34, ax1 = L2.altX - 34;
+  const ay0 = L2.hdgY + L2.hdgH + 52, ay1 = H - 78;
+  L2.att = { x: ax0, y: ay0, w: ax1 - ax0, h: ay1 - ay0 };
+  L = L2;
+}
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  st.width = cv.width; st.height = cv.height;
+  stx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  readSafe(); computeLayout(); renderStatic();
+}
+window.addEventListener('resize', () => setTimeout(resize, 60));
+if (screen.orientation && screen.orientation.addEventListener) {
+  screen.orientation.addEventListener('change', () => setTimeout(resize, 60));
+}
+
+/* ═══════════════ ГРАФІЧНІ ХЕЛПЕРИ ═══════════════ */
+const font = (s, b) => (b ? '700 ' : '400 ') + s + 'px ' + MONO;
+function stroke2(c, color, w, glow) {
+  if (glow) {
+    c.save(); c.strokeStyle = color; c.globalAlpha = 0.26; c.lineWidth = w * 3.1; c.stroke(); c.restore();
+  }
+  c.strokeStyle = color; c.lineWidth = w; c.stroke();
+}
+function rrect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+function flagBox(c, text, cx, cy, color, blink, now) {
+  c.save();
+  if (blink && !REDUCED) c.globalAlpha = 0.55 + 0.45 * Math.sin(now / 160);
+  c.font = font(13, true);
+  const w = c.measureText(text).width + 18, h = 24;
+  c.fillStyle = 'rgba(0,0,0,.85)';
+  rrect(c, cx - w / 2, cy - h / 2, w, h, 2); c.fill();
+  stroke2(c, color, 1.6, false);
+  c.fillStyle = color; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(text, cx, cy + 1);
+  c.restore();
+}
+
+/* ═══════════════ СТАТИЧНИЙ ШАР ═══════════════ */
+function renderStatic() {
+  stx.clearRect(0, 0, W, H);
+  const cx = L.cx, cy = L.cy, R = L.bankR;
+
+  // Waterline (символ літального апарата)
+  stx.beginPath();
+  stx.moveTo(cx - 52, cy); stx.lineTo(cx - 18, cy); stx.lineTo(cx - 9, cy + 11);
+  stx.lineTo(cx, cy); stx.lineTo(cx + 9, cy + 11); stx.lineTo(cx + 18, cy); stx.lineTo(cx + 52, cy);
+  stroke2(stx, G, 3, true);
+  stx.fillStyle = G; stx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
+
+  // Дуга крену + риски + референс
+  stx.beginPath();
+  stx.arc(cx, cy, R, (-90 - 62) * D2R, (-90 + 62) * D2R);
+  stroke2(stx, GFAINT, 1.2, false);
+  stx.font = font(11); stx.textAlign = 'center'; stx.textBaseline = 'middle';
+  for (const a of [-60, -45, -30, -20, -10, 10, 20, 30, 45, 60]) {
+    const big = Math.abs(a) === 30 || Math.abs(a) === 60;
+    const ux = Math.sin(a * D2R), uy = -Math.cos(a * D2R);
+    const x0 = cx + R * ux, y0 = cy + R * uy;
+    const len = big ? 14 : 9;
+    stx.beginPath(); stx.moveTo(x0, y0); stx.lineTo(x0 + ux * len, y0 + uy * len);
+    stroke2(stx, big ? G : GDIM, big ? 2 : 1.3, false);
+    if (big) {
+      stx.fillStyle = GDIM;
+      stx.fillText(String(Math.abs(a)), cx + (R + len + 13) * ux, cy + (R + len + 13) * uy);
     }
+  }
+  // фіксований референс-трикутник (вершиною вниз, до рухомого покажчика)
+  stx.beginPath();
+  stx.moveTo(cx, cy - R - 2); stx.lineTo(cx - 7, cy - R - 14); stx.lineTo(cx + 7, cy - R - 14);
+  stx.closePath(); stx.fillStyle = G; stx.fill();
 
-    function resetHorizon() {
-        state.offsetPitch = state.rawPitch;
-        state.offsetRoll  = state.rawRoll;
-        if (navigator.vibrate) navigator.vibrate(50);
-    }
+  // Стрічки: назви зверху та одиниці знизу
+  const top = cy - L.tapeH / 2, bot = cy + L.tapeH / 2;
+  stx.font = font(12, true); stx.fillStyle = GDIM; stx.textAlign = 'center';
+  stx.fillText('SPD', L.spdX + L.tapeW / 2, top - 14);
+  stx.fillText('ALT', L.altX + L.tapeW / 2, top - 14);
+  stx.font = font(11);
+  stx.fillText('КМ/Г', L.spdX + L.tapeW / 2, bot + 16);
+  stx.fillText('М', L.altX + L.tapeW / 2, bot + 16);
 
-    function updateDebugAndStatus() {
-        const isLive = (Date.now() - state.lastUpdate) < 1000;
-        debugPanel.innerHTML = `
-            <b>SYSTEM DATA</b><br>
-            ROLL (L-TAPE): <span style="color:#0f0">${state.roll.toFixed(1)}°</span><br>
-            PITCH (CENTER): <span style="color:#0f0">${state.pitch.toFixed(1)}°</span><br>
-            HEADING: <span style="color:#0f0">${state.heading.toFixed(0)}°</span><br><br>
-            <span style="color:${isLive ? '#0f0' : '#f00'}">${isLive ? 'SENSORS OK' : 'SENSOR ERROR'}</span>
-        `;
-        statusBar.innerHTML = `SYS: ACTIVE | GYRO: ${state.gyroActive ? 'OK' : 'ERR'}`;
-    }
+  // Лаббер курсу (трикутник вершиною вгору, до стрічки)
+  const ly = L.hdgY + L.hdgH + 16;
+  stx.beginPath();
+  stx.moveTo(cx, ly); stx.lineTo(cx - 6, ly + 10); stx.lineTo(cx + 6, ly + 10);
+  stx.closePath(); stx.fillStyle = G; stx.fill();
+}
 
-    function drawHorizon() {
-        const w = canvas.width, h = canvas.height;
-        const cx = w/2, cy = h/2;
+/* ═══════════════ ДИНАМІЧНИЙ РЕНДЕР ═══════════════ */
+function drawAttitude(now) {
+  if (!S.att.ok) {
+    const b = { x: L.cx - L.ladW / 2, y: L.cy - L.ladH / 2, w: L.ladW, h: L.ladH };
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + b.w, b.y + b.h);
+    ctx.moveTo(b.x + b.w, b.y); ctx.lineTo(b.x, b.y + b.h);
+    stroke2(ctx, RED, 3, false);
+    flagBox(ctx, 'ATT', L.cx, L.cy - 34, RED, true, now);
+    return;
+  }
+  const p = S.att.p, r = S.att.r, py = p * L.ppd;
 
-        // Плавная фильтрация для предотвращения "сальто" и рывков
-        state.pitch = state.pitch * 0.85 + ((state.rawPitch - state.offsetPitch) * 0.15);
-        state.roll  = state.roll  * 0.85 + ((state.rawRoll  - state.offsetRoll)  * 0.15);
-        state.heading = state.rawHeading;
+  // Горизонт — широкий кліп між стрічками
+  ctx.save();
+  ctx.beginPath(); ctx.rect(L.att.x, L.att.y, L.att.w, L.att.h); ctx.clip();
+  ctx.translate(L.cx, L.cy); ctx.rotate(-r * D2R);
+  ctx.beginPath(); ctx.moveTo(-W * 1.5, py); ctx.lineTo(W * 1.5, py);
+  stroke2(ctx, G, 2.4, true);
+  ctx.restore();
 
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(state.roll * Math.PI / 180);
-
-        const pitchY = state.pitch * 8; 
-
-        ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 3;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#0f0';
-
-        // Линия горизонта
+  // Драбина тангажа — вузький кліп
+  ctx.save();
+  ctx.beginPath(); ctx.rect(L.cx - L.ladW / 2, L.cy - L.ladH / 2, L.ladW, L.ladH); ctx.clip();
+  ctx.translate(L.cx, L.cy); ctx.rotate(-r * D2R); ctx.translate(0, py);
+  ctx.font = font(13); ctx.textBaseline = 'middle';
+  const gap = 46, majL = L.ladW / 2 - 40, minL = gap + 42;
+  for (let i = -90; i <= 90; i += 5) {
+    if (i === 0) continue;
+    const y = -i * L.ppd;
+    if (Math.abs(y + py * 0) > L.ladH * 1.4 + Math.abs(py)) continue;
+    const maj = i % 10 === 0;
+    const len = maj ? majL : minL;
+    ctx.setLineDash(i < 0 ? [9, 7] : []);
+    ctx.beginPath();
+    ctx.moveTo(-len, y); ctx.lineTo(-gap, y);
+    ctx.moveTo(gap, y); ctx.lineTo(len, y);
+    stroke2(ctx, maj ? G : GDIM, maj ? 2 : 1.3, false);
+    if (maj) {
+      if (Math.abs(i) >= 50) {   // стаби-вказівники до горизонту на крайніх лініях
+        ctx.setLineDash([]);
+        const s = Math.sign(i) * 10;
         ctx.beginPath();
-        ctx.moveTo(-w, pitchY);
-        ctx.lineTo(w, pitchY);
-        ctx.stroke();
-
-        // Шкала тангажа в центре
-        ctx.lineWidth = 2;
-        ctx.textAlign = 'center';
-        for (let i = -60; i <= 60; i += 10) {
-            if (i === 0) continue;
-            const y = pitchY - i * 8;
-            ctx.beginPath();
-            ctx.moveTo(-50, y);
-            ctx.lineTo(50, y);
-            ctx.stroke();
-            ctx.fillText(Math.abs(i), 70, y + 5);
-            ctx.fillText(Math.abs(i), -70, y + 5);
-        }
-        ctx.restore();
+        ctx.moveTo(-len, y); ctx.lineTo(-len, y + s);
+        ctx.moveTo(len, y); ctx.lineTo(len, y + s);
+        stroke2(ctx, G, 2, false);
+      }
+      ctx.fillStyle = G;
+      ctx.textAlign = 'right'; ctx.fillText(String(Math.abs(i)), -len - 8, y);
+      ctx.textAlign = 'left'; ctx.fillText(String(Math.abs(i)), len + 8, y);
     }
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
 
-    function drawTape(x, y, value, label, side, unit) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(side === 'L' ? -50 : 0, -140, 50, 280);
+  if (S.att.demo) flagBox(ctx, 'ДЕМО', L.cx, L.cy - L.ladH / 2 - 16, AMB, false, now);
+}
 
-        // Масштаб: 1 единица = 5 пикселей
-        const start = Math.floor(value / 10) * 10 - 30;
-        ctx.font = '12px monospace';
-        ctx.fillStyle = '#0f0';
-        
-        for (let i = start; i <= start + 60; i += 10) {
-            const pos = (value - i) * 6;
-            if (Math.abs(pos) > 130) continue;
-            ctx.beginPath();
-            ctx.moveTo(side === 'L' ? -15 : 0, pos);
-            ctx.lineTo(side === 'L' ? 0 : 15, pos);
-            ctx.stroke();
-            ctx.fillText(i, side === 'L' ? -35 : 25, pos + 4);
-        }
-        
-        // Цифровое табло в центре барабана
-        ctx.fillStyle = 'rgba(0,0,0,0.8)';
-        ctx.fillRect(side === 'L' ? -55 : -5, -20, 60, 40);
-        ctx.strokeStyle = '#0f0';
-        ctx.strokeRect(side === 'L' ? -55 : -5, -20, 60, 40);
-        ctx.fillStyle = '#0f0';
-        ctx.font = 'bold 18px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(Math.round(value), side === 'L' ? -25 : 25, 7);
-        
-        ctx.font = 'bold 12px monospace';
-        ctx.fillText(label, side === 'L' ? -25 : 25, -150);
-        ctx.restore();
+function drawBank() {
+  if (!S.att.ok) return;
+  const th = clamp(S.att.r, -68, 68) * D2R, R = L.bankR;
+  ctx.save();
+  ctx.translate(L.cx, L.cy); ctx.rotate(th);
+  ctx.beginPath();
+  ctx.moveTo(0, -R + 3); ctx.lineTo(-8, -R + 18); ctx.lineTo(8, -R + 18); ctx.closePath();
+  ctx.fillStyle = G;
+  ctx.save(); ctx.shadowColor = G; ctx.shadowBlur = 8; ctx.fill(); ctx.restore();
+  if (S.slipOk) {
+    const off = clamp(S.slip / 0.35, -1, 1) * 26;
+    ctx.beginPath();
+    ctx.moveTo(off - 9, -R + 22); ctx.lineTo(off + 9, -R + 22);
+    ctx.lineTo(off + 7, -R + 31); ctx.lineTo(off - 7, -R + 31); ctx.closePath();
+    ctx.fillStyle = Math.abs(S.slip) > 0.28 ? AMB : G;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawHeading(now) {
+  const cx = L.cx, y0 = L.hdgY, hw = L.hdgW, hh = L.hdgH;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(cx - hw / 2, y0 - 4, hw, hh + 22); ctx.clip();
+  if (S.hdg.ok) {
+    const cur = S.hdg.val;
+    const base = Math.round(cur / 5) * 5;
+    const n = Math.ceil((hw / 2) / 3.4 / 5) + 1;
+    ctx.font = font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let k = -n; k <= n; k++) {
+      const deg = base + k * 5;
+      const d = ((deg - cur + 540) % 360 + 360) % 360 - 180;
+      const x = cx + d * 3.4;
+      const dd = ((Math.round(deg) % 360) + 360) % 360;
+      const maj = dd % 10 === 0;
+      ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y0 + (maj ? 11 : 6));
+      stroke2(ctx, maj ? G : GDIM, maj ? 1.8 : 1.1, false);
+      if (maj) {
+        const lbl = CARD[dd] !== undefined ? CARD[dd] : String(dd / 10).padStart(2, '0');
+        ctx.fillStyle = CARD[dd] !== undefined ? G : GDIM;
+        ctx.fillText(lbl, x, y0 + 14);
+      }
     }
+  }
+  ctx.restore();
 
-    function animate() {
-        if (!state.active) return;
-        state.frame++;
-        const w = canvas.width = window.innerWidth;
-        const h = canvas.height = window.innerHeight;
-        
-        drawHorizon();
+  // цифрове табло курсу
+  const bw = 82, bh = 27, by = L.hdgY + hh + 26;
+  ctx.fillStyle = 'rgba(0,0,0,.82)';
+  rrect(ctx, cx - bw / 2, by, bw, bh, 2); ctx.fill();
+  stroke2(ctx, S.hdg.ok ? G : RED, 1.6, false);
+  ctx.font = font(17, true); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = S.hdg.ok ? G : RED;
+  ctx.fillText(S.hdg.ok ? String(Math.round(S.hdg.val) % 360).padStart(3, '0') + '°' : '– – –', cx, by + bh / 2 + 1);
+  if (S.hdg.ok && S.hdg.mode !== 'MAG') {
+    ctx.font = font(9, true); ctx.textAlign = 'left'; ctx.fillStyle = AMB;
+    ctx.fillText(S.hdg.mode, cx + bw / 2 + 6, by + bh / 2 + 1);
+  }
+  if (!S.hdg.ok) flagBox(ctx, 'HDG', cx - bw / 2 - 34, by + bh / 2, RED, true, now);
+}
 
-        // ЛЕВЫЙ БАРАБАН: КРЕН (Roll)
-        drawTape(120, h/2, state.roll, "ROLL", "L", "°");
-        
-        // ПРАВЫЙ БАРАБАН: ВЫСОТА (Alt - демо)
-        const demoAlt = 150 + Math.sin(state.frame/50)*10;
-        drawTape(w - 120, h/2, demoAlt, "ALT", "R", "FT");
+function drawTape(side, ch, cfg, now) {
+  const x = side === 'L' ? L.spdX : L.altX;
+  const w = L.tapeW, top = L.cy - L.tapeH / 2, bot = L.cy + L.tapeH / 2;
+  const inner = side === 'L' ? x + w : x;
+  const dir = side === 'L' ? -1 : 1;
+  const live = cfg.fresh() && ch.val != null;
 
-        // Прицел
-        ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(w/2, h/2, 20, 0, Math.PI*2);
-        ctx.moveTo(w/2-40, h/2); ctx.lineTo(w/2-20, h/2);
-        ctx.moveTo(w/2+40, h/2); ctx.lineTo(w/2+20, h/2);
-        ctx.stroke();
+  // внутрішнє ребро
+  ctx.beginPath(); ctx.moveTo(inner, top); ctx.lineTo(inner, bot);
+  stroke2(ctx, GDIM, 1.4, false);
 
-        ctx.font = 'bold 20px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`HDG ${Math.round(state.heading)}°`, w/2, 80);
-
-        requestAnimationFrame(animate);
+  if (live) {
+    const v = ch.val;
+    const rangeU = (L.tapeH / 2) / cfg.ppu;
+    let tk = Math.ceil((v - rangeU) / cfg.minor) * cfg.minor;
+    ctx.font = font(12); ctx.textBaseline = 'middle';
+    ctx.textAlign = side === 'L' ? 'left' : 'right';
+    const lx = side === 'L' ? x + 2 : x + w - 2;
+    for (; tk <= v + rangeU; tk += cfg.minor) {
+      if (cfg.min != null && tk < cfg.min) continue;
+      const y = L.cy + (v - tk) * cfg.ppu;
+      if (y < top + 3 || y > bot - 3) continue;
+      const ti = Math.round(tk);
+      const maj = ti % cfg.major === 0;
+      ctx.beginPath(); ctx.moveTo(inner, y); ctx.lineTo(inner + dir * (maj ? 13 : 7), y);
+      stroke2(ctx, maj ? G : GDIM, maj ? 1.8 : 1.1, false);
+      if (maj && Math.abs(y - L.cy) > 24) {
+        ctx.fillStyle = GDIM; ctx.fillText(String(ti), lx, y);
+      }
     }
+    // тренд-стрілка (прогноз на 6 с)
+    const dv = ch.trend * 6 * cfg.ppu;
+    const ay = clamp(dv, -L.tapeH * 0.42, L.tapeH * 0.42);
+    if (Math.abs(ay) > 12) {
+      const axp = inner - dir * 10;
+      const ey = L.cy - ay;
+      ctx.beginPath(); ctx.moveTo(axp, L.cy); ctx.lineTo(axp, ey);
+      const ah = 6 * Math.sign(ay);
+      ctx.moveTo(axp - 4, ey + ah); ctx.lineTo(axp, ey);
+      ctx.lineTo(axp + 4, ey + ah);
+      stroke2(ctx, G, 1.8, false);
+    }
+  }
+
+  // цифрове табло + носик до центру
+  const bw = w + 20, bh = 34;
+  const bx = side === 'L' ? x - 3 : x + w + 3 - bw;
+  ctx.fillStyle = 'rgba(0,0,0,.84)';
+  rrect(ctx, bx, L.cy - bh / 2, bw, bh, 2); ctx.fill();
+  stroke2(ctx, live ? G : GDIM, 1.6, false);
+  const apex = side === 'L' ? bx + bw + 9 : bx - 9;
+  const edge = side === 'L' ? bx + bw : bx;
+  ctx.beginPath();
+  ctx.moveTo(edge, L.cy - 7); ctx.lineTo(apex, L.cy); ctx.lineTo(edge, L.cy + 7);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,0,0,.84)'; ctx.fill();
+  stroke2(ctx, live ? G : GDIM, 1.6, false);
+  ctx.font = font(19, true); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = live ? G : GDIM;
+  ctx.save(); if (live) { ctx.shadowColor = G; ctx.shadowBlur = 7; }
+  ctx.fillText(live ? String(Math.round(ch.val)) : '– – –', bx + bw / 2 - dir * 2, L.cy + 1);
+  ctx.restore();
+
+  // прапорці стану даних
+  const fcx = bx + bw / 2;
+  if (S.src === 'GPS' && (!gpsFresh() || S.gps.denied)) {
+    flagBox(ctx, 'GPS', fcx, top - 16, RED, true, now);
+  } else if (S.src === 'DEMO') {
+    flagBox(ctx, 'ДЕМО', fcx, top - 16, AMB, false, now);
+  }
+}
+
+function draw(now) {
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(st, 0, 0, st.width, st.height, 0, 0, W, H);
+  drawAttitude(now);
+  drawBank();
+  drawHeading(now);
+  drawTape('L', S.spd, { ppu: 2.6, minor: 5, major: 20, min: 0, fresh: () => S.src === 'DEMO' ? true : gpsFresh() }, now);
+  drawTape('R', S.alt, { ppu: 1.5, minor: 10, major: 50, min: null, fresh: () => S.src === 'DEMO' ? true : gpsFresh() }, now);
+}
+
+/* ═══════════════ АПДЕЙТ СТЕЙТУ ═══════════════ */
+function kOf(dt, tau) { return 1 - Math.exp(-dt / tau); }
+
+function update(dt, now) {
+  const ang = effAngle();
+  const tSec = now / 1000;
+  const o = freshOri();
+
+  // ── атитюд ──
+  if (o) {
+    S.att.demo = false;
+    const att = attitudeFromEuler(o.a || 0, o.b, o.g, ang);
+    const tp = att.pitch - S.trimP;
+    const k = kOf(dt, TAU_ATT);
+    S.att.p += (tp - S.att.p) * k;
+    if (att.roll != null) {
+      const tr = att.roll - S.trimR;
+      const dr = ((tr - S.att.r + 540) % 360 + 360) % 360 - 180;
+      S.att.r += dr * k;
+      S.att.r = ((S.att.r + 540) % 360 + 360) % 360 - 180;
+    }
+    S.att.ok = true;
+  } else if (!S.everOri && S.booted && now - S.armTs > 2500) {
+    // немає гіроскопа взагалі (десктоп / відмова) → синтетичний атитюд для прев'ю
+    S.att.demo = true; S.att.ok = true;
+    const k = kOf(dt, 0.15);
+    S.att.p += (7 * Math.sin(tSec / 3.7) - S.att.p) * k;
+    S.att.r += (22 * Math.sin(tSec / 2.9) + 8 * Math.sin(tSec / 1.3) - S.att.r) * k;
+  } else {
+    S.att.ok = false; S.att.demo = false;
+  }
+
+  // ── курс ──
+  let target = null, mode = '—';
+  if (S.hasAbs && now - S.oriAbs.ts < 1500 && S.oriAbs.a != null) {
+    target = headingFromMatrix(rotZXY(S.oriAbs.a, S.oriAbs.b || 0, S.oriAbs.g || 0)); mode = 'MAG';
+  } else if (S.webkitHdg != null && now - S.webkitTs < 1500) {
+    const corr = IOS_HDG_CORR[ang] !== undefined ? IOS_HDG_CORR[ang] : 0;
+    target = ((S.webkitHdg + corr) % 360 + 360) % 360; mode = 'MAG';
+  } else if (o && o.a != null) {
+    target = headingFromMatrix(rotZXY(o.a, o.b, o.g)); mode = 'REL';
+  } else if (S.att.demo) {
+    target = (tSec * 4) % 360; mode = 'ДЕМО';
+  }
+  if (target != null) {
+    const cur = ((S.hdg.cont % 360) + 360) % 360;
+    const d = ((target - cur + 540) % 360 + 360) % 360 - 180;
+    S.hdg.cont += d * kOf(dt, TAU_HDG);
+    S.hdg.val = ((S.hdg.cont % 360) + 360) % 360;
+    S.hdg.ok = true; S.hdg.mode = mode;
+  } else { S.hdg.ok = false; S.hdg.mode = '—'; }
+
+  // ── ковзання ──
+  if (S.att.demo) {
+    S.slipOk = true;
+    S.slip += (0.15 * Math.sin(tSec / 2.1) - S.slip) * kOf(dt, TAU_SLIP);
+  } else if (now - S.mot.ts < 1200 && o) {
+    S.slipOk = true;
+    const A = ang * D2R, sx = Math.cos(A), sy = -Math.sin(A);
+    const lat = S.mot.sign * (S.mot.x * sx + S.mot.y * sy) / 9.81;
+    S.slip += (clamp(lat, -0.6, 0.6) - S.slip) * kOf(dt, TAU_SLIP);
+  } else S.slipOk = false;
+
+  // ── стрічки ──
+  if (S.src === 'DEMO') feedDemoTapes(tSec);
+  const kt = kOf(dt, TAU_TAPE);
+  for (const ch of [S.spd, S.alt]) {
+    if (ch.raw != null && ch.val != null) ch.val += (ch.raw - ch.val) * kt;
+  }
+
+  // ── частота подій орієнтації ──
+  if (now - S._hzT > 1000) {
+    S.oriHz = S._hzC * 1000 / Math.max(1, now - S._hzT);
+    S._hzC = 0; S._hzT = now;
+  }
+}
+
+/* ═══════════════ ГОЛОВНИЙ ЦИКЛ ═══════════════ */
+let lastT = 0;
+function frame(t) {
+  requestAnimationFrame(frame);
+  if (!lastT) { lastT = t; return; }
+  const dt = Math.min(0.1, (t - lastT) / 1000) || 0.016;
+  lastT = t;
+  S.fps += (1 / dt - S.fps) * 0.05;
+  update(dt, t);
+  draw(t);
+}
+
+/* ═══════════════ СТАТУС / ЧІПИ / ДЕБАГ (4 Гц) ═══════════════ */
+function fmt1(v) { return (v >= 0 ? '+' : '') + v.toFixed(1); }
+function refreshHUDText() {
+  const giro = S.att.demo ? 'ДЕМО' : (S.att.ok ? 'ОК' : 'НЕМА');
+  let gpsTxt;
+  if (S.src === 'DEMO') gpsTxt = 'СИНТЕТИКА';
+  else if (S.gps.denied) gpsTxt = 'ВІДМОВА';
+  else if (gpsFresh()) gpsTxt = '±' + Math.round(S.gps.acc) + 'М';
+  else gpsTxt = 'ПОШУК…';
+  statusEl.textContent = 'PFD v9.0 · ГІРО ' + giro + ' · HDG ' + S.hdg.mode + ' · GPS ' + gpsTxt;
+
+  srcChip.textContent = 'ДЖЕРЕЛО: ' + (S.src === 'DEMO' ? 'ДЕМО' : 'GPS');
+  srcChip.classList.toggle('amb', S.src === 'DEMO');
+  if (S.src === 'DEMO') { gpsChip.textContent = 'ДАНІ: СИНТЕТИКА'; gpsChip.className = 'chip amb'; }
+  else if (S.gps.denied) { gpsChip.textContent = 'GPS: ВІДМОВА'; gpsChip.className = 'chip red'; }
+  else if (gpsFresh()) { gpsChip.textContent = 'GPS: ±' + Math.round(S.gps.acc) + ' М'; gpsChip.className = 'chip'; }
+  else { gpsChip.textContent = 'GPS: ПОШУК…'; gpsChip.className = 'chip amb'; }
+
+  if (debugEl.style.display === 'block') {
+    const o = freshOri();
+    const f = v => v == null ? '·' : (+v).toFixed(1);
+    debugEl.textContent =
+      'α β γ    ' + (o ? f(o.a) + ' ' + f(o.b) + ' ' + f(o.g) : '— — —') + '\n' +
+      'abs/wk   ' + (S.hasAbs ? 'ABS' : '·') + ' / ' + f(S.webkitHdg) + '\n' +
+      'angle    ' + effAngle() + '° flip:' + (SCREEN_ANGLE_FLIP ? '1' : '0') + '\n' +
+      'pitch    ' + S.att.p.toFixed(2) + '°\n' +
+      'roll     ' + S.att.r.toFixed(2) + '°\n' +
+      'hdg      ' + S.hdg.val.toFixed(1) + '° ' + S.hdg.mode + '\n' +
+      'trim     P' + fmt1(S.trimP) + ' R' + fmt1(S.trimR) + '\n' +
+      'ori Hz   ' + S.oriHz.toFixed(0) + '\n' +
+      'acc xyz  ' + f(S.mot.x) + ' ' + f(S.mot.y) + ' ' + f(S.mot.z) + ' s:' + S.mot.sign + '\n' +
+      'slip     ' + S.slip.toFixed(3) + ' g\n' +
+      'gps acc  ' + f(S.gps.acc) + ' м\n' +
+      'spd/alt  ' + f(S.spd.val) + ' / ' + f(S.alt.val) + '\n' +
+      'fps      ' + S.fps.toFixed(0);
+  }
+}
+
+/* ═══════════════ КЕРУВАННЯ ═══════════════ */
+function persistTrim() {
+  localStorage.setItem('pfd.trimP', String(S.trimP));
+  localStorage.setItem('pfd.trimR', String(S.trimR));
+}
+let trimTimer = null, trimLong = false;
+const trimBtn = $('trimBtn');
+trimBtn.addEventListener('contextmenu', e => e.preventDefault());
+trimBtn.addEventListener('pointerdown', () => {
+  trimLong = false;
+  trimTimer = setTimeout(() => {
+    trimLong = true; S.trimP = 0; S.trimR = 0; persistTrim();
+    vib([30, 60, 30]); toast('ТРИМ СКИНУТО');
+  }, 600);
+});
+function trimUp() {
+  clearTimeout(trimTimer);
+  if (trimLong) return;
+  if (!S.att.ok || S.att.demo) { toast('НЕМА ЖИВОГО АТИТЮДУ — ТРИМ НЕ СТАВЛЮ'); return; }
+  S.trimP += S.att.p; S.trimR += S.att.r; persistTrim();
+  vib(35); toast('ТРИМ  P ' + fmt1(S.trimP) + '°  R ' + fmt1(S.trimR) + '°');
+}
+trimBtn.addEventListener('pointerup', trimUp);
+trimBtn.addEventListener('pointercancel', () => clearTimeout(trimTimer));
+trimBtn.addEventListener('pointerleave', () => clearTimeout(trimTimer));
+
+$('srcChip').addEventListener('click', () => {
+  S.src = S.src === 'GPS' ? 'DEMO' : 'GPS';
+  localStorage.setItem('pfd.src', S.src);
+  resetChan(S.spd); resetChan(S.alt);
+  toast(S.src === 'DEMO' ? 'ДАНІ: СИНТЕТИКА' : 'ДАНІ: GPS');
+  refreshHUDText();
+});
+
+$('fsBtn').addEventListener('click', async () => {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    } else await document.exitFullscreen();
+  } catch (e) {
+    toast('ФУЛСКРІН ТУТ НЕ ЖИВЕ — ДОДАЙ НА ПОЧАТКОВИЙ ЕКРАН');
+  }
+});
+
+$('dbgBtn').addEventListener('click', () => {
+  debugEl.style.display = debugEl.style.display === 'block' ? 'none' : 'block';
+});
+
+/* ═══════════════ WAKE LOCK ═══════════════ */
+let wl = null;
+async function lockWake() {
+  try { if ('wakeLock' in navigator) wl = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.booted) lockWake();
+});
+
+/* ═══════════════ BOOT ═══════════════ */
+const blog = $('blog');
+function bootLine(name) {
+  const div = document.createElement('div');
+  const bn = document.createElement('span'); bn.className = 'bn';
+  bn.textContent = '> ' + name.padEnd(14, '·') + ' ';
+  const bs = document.createElement('span'); bs.textContent = '…';
+  div.appendChild(bn); div.appendChild(bs);
+  blog.appendChild(div);
+  return bs;
+}
+function setLine(el, text, cls) { el.textContent = text; el.className = cls || 'ok'; }
+async function waitOriEvent(ms) {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) {
+    if (S.everOri) return true;
+    await sleep(90);
+  }
+  return S.everOri;
+}
+
+async function arm() {
+  const btn = $('armBtn');
+  btn.disabled = true;
+  S.armTs = performance.now();
+
+  // 1) дозволи сенсорів — мусять бути всередині жесту (iOS)
+  try {
+    if (window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission)
+      await DeviceOrientationEvent.requestPermission();
+  } catch (e) {}
+  try {
+    if (window.DeviceMotionEvent && DeviceMotionEvent.requestPermission)
+      await DeviceMotionEvent.requestPermission();
+  } catch (e) {}
+  addSensorListeners();
+
+  const l0 = bootLine('СИСТЕМА'); setLine(l0, 'ПАШЛА');
+  if (!REDUCED) await sleep(140);
+
+  // 2) камера
+  const l1 = bootLine('КАМЕРА');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } }, audio: false
+    });
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+    S.camOk = true; setLine(l1, 'Є КАРТИНКА');
+  } catch (e) { setLine(l1, 'ВІДМОВА — ЧОРНЕ ТЛО', 'warn'); }
+  if (!REDUCED) await sleep(120);
+
+  // 3) гіроскоп
+  const l2 = bootLine('ГІРОСКОП');
+  const got = await waitOriEvent(1300);
+  setLine(l2, got ? 'Є КОНТАКТ' : 'ТИША → ДЕМО-АТИТЮД', got ? 'ok' : 'warn');
+
+  // 4) GPS
+  const l3 = bootLine('GPS');
+  startGPS();
+  setLine(l3, S.src === 'DEMO' ? 'НА ЛАВЦІ (ДЖЕРЕЛО: ДЕМО)' : 'ШУКАЄМ СУПУТНИКИ…', 'warn');
+  if (!REDUCED) await sleep(120);
+
+  const l4 = bootLine('ГОТОВО'); setLine(l4, 'ТРИМАЙ ГОРИЗОНТ');
+
+  lockWake();
+  S.booted = true;
+  document.body.classList.add('booted');
+  refreshHUDText();
+  setInterval(refreshHUDText, 250);
+  requestAnimationFrame(frame);
+
+  await sleep(REDUCED ? 150 : 600);
+  const boot = $('boot');
+  boot.classList.add('off');
+  setTimeout(() => boot.remove(), 600);
+}
+$('armBtn').addEventListener('click', arm);
+
+/* ═══════════════ СТАРТ ═══════════════ */
+resize();
 </script>
 </body>
 </html>
