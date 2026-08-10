@@ -6,17 +6,18 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
-<title>DRONE PFD v11.0</title>
+<title>DRONE PFD v12.0</title>
 <!--
-  DRONE PFD v11.0 — мобільний пілотажний дисплей + система захвату цілей (ландшафт, FPV)
+  DRONE PFD v12.0 — мобільний пілотажний дисплей + система захвату цілей (ландшафт, FPV)
   ────────────────────────────────────────────────────────────────────────────────────
   АРХІТЕКТУРА: TelemetrySource → State → Renderer. Рендер малює тільки зі стейту.
     Джерела: PhoneIMU (deviceorientation[absolute]+devicemotion), PhoneGPS (watchPosition).
     Пізніше сюди підключиться MSP/CRSF (Web Serial / WebSocket) без змін рендера.
 
-  БАЧЕННЯ (WebGL): БАЗА (посилений) / ТЕПЛО (iron white-hot LUT + bloom) / НІЧ (gen-3
-    підсилення + зелень + сенсорний шум). Кнопка поряд з GPS. Fallback на CSS-фільтр,
-    якщо WebGL недоступний (позначка GL:OFF).
+  БАЧЕННЯ (WebGL): БАЗА (посилений) / ТЕПЛО (синтетичний тепловізор: локальна нормалізація
+    + підсилення в темряві → тепловий силует об'єктів, що виділяються з фону; НЕ реальна
+    температура — телефон не має IR-сенсора) / НІЧ (gen-3 підсилення + зелень + шум).
+    Кнопка поряд з GPS. Fallback на CSS-фільтр, якщо WebGL недоступний (позначка GL:OFF).
 
   ЦІЛІ — ЧЕСНО ПРО МЕЖІ: це НЕ навчений розпізнавач. Виявлення = різниця кадрів (рух)
     + гарячі плями (яскравість у тепловому сенсі). Класифікація = сигнатура (HOT/WARM/
@@ -133,7 +134,7 @@ button.chip:active{background:rgba(0,255,65,.18)}
 <div class="scanlines"></div>
 <div class="vignette"></div>
 
-<div id="statusbar">PFD v11.0</div>
+<div id="statusbar">PFD v12.0</div>
 
 <div class="chips">
   <span class="chip" id="gpsChip">GPS: —</span>
@@ -155,7 +156,7 @@ button.chip:active{background:rgba(0,255,65,.18)}
 
 <div id="boot">
   <div class="bframe">
-    <div class="btitle">DRONE PFD <small>v11.0</small></div>
+    <div class="btitle">DRONE PFD <small>v12.0</small></div>
     <div class="bsub">ЛАНДШАФТ · БАЧЕННЯ · ГІРО · GPS · ЗАХВАТ ЦІЛЕЙ</div>
     <pre id="blog"></pre>
     <button id="armBtn">АРМ</button>
@@ -490,12 +491,19 @@ const FRAG = [
   '  vec3 rgb=texture2D(uTex,uv).rgb; float L=dot(rgb,LW);',
   '  vec2 q=vUv-0.5; float vig=1.0-dot(q,q)*0.55; vec3 col;',
   '  if(uMode==1){',
-  '    float pv=0.52;',
-  '    float hv=smoothstep(pv-0.06,pv+0.10,L);',
-  '    vec3 cold=mix(vec3(0.0,0.0,0.06),vec3(0.06,0.02,0.34),smoothstep(0.0,pv,L));',
-  '    vec3 hotc=iron(smoothstep(pv,1.0,L));',
-  '    col=mix(cold,hotc,hv);',
-  '    float wh=smoothstep(0.86,1.0,L); col+=wh*vec3(0.4,0.35,0.2); col*=vig;',
+  '    float r=0.045, r2=0.031820;',
+  '    float Lm=L;',
+  '    Lm+=dot(texture2D(uTex,uv+vec2(r,0.0)).rgb,LW); Lm+=dot(texture2D(uTex,uv+vec2(-r,0.0)).rgb,LW);',
+  '    Lm+=dot(texture2D(uTex,uv+vec2(0.0,r)).rgb,LW); Lm+=dot(texture2D(uTex,uv+vec2(0.0,-r)).rgb,LW);',
+  '    Lm+=dot(texture2D(uTex,uv+vec2(r2,r2)).rgb,LW); Lm+=dot(texture2D(uTex,uv+vec2(-r2,r2)).rgb,LW);',
+  '    Lm+=dot(texture2D(uTex,uv+vec2(r2,-r2)).rgb,LW); Lm+=dot(texture2D(uTex,uv+vec2(-r2,-r2)).rgb,LW);',
+  '    Lm*=0.11111;',                                          // локальне середнє (9 відліків)
+  '    float g=pow(clamp(L*3.0,0.0,1.0),0.72);',               // підсилення в сутінках/темряві
+  '    float diff=L-Lm;',                                      // локальна виразність → силует тіла
+  '    float heat=clamp(diff*3.4+g*0.34,0.0,1.0);',            // фон(diff~0,темно)=холодний; виразне тіло=гаряче
+  '    vec3 tc=iron(heat);',
+  '    float wh=smoothstep(0.85,1.0,heat); tc+=wh*vec3(0.35,0.32,0.2);',
+  '    col=tc*vig;',
   '  } else if(uMode==2){',
   '    float g=pow(clamp(L*2.15,0.0,1.0),0.82);',
   '    float n=hash(uv*uRes+uTime*90.0); g+=(n-0.5)*0.10;',
@@ -688,7 +696,8 @@ function drawAttitude(now) {
     ctx.font = font(14, true); ctx.fillText('ГІРОСКОП НЕ ВІДПОВІДАЄ', L.cx, by + 22);
     let reason;
     if (S.oriPerm === 'denied') reason = 'ДОЗВІЛ ВІДХИЛЕНО · SAFARI › ДОСТУП ДО РУХУ';
-    else if (S.oriPerm === 'error') reason = 'ПОМИЛКА ДОСТУПУ · ПОТРІБЕН HTTPS';
+    else if (S.oriPerm === 'granted') reason = 'ДОЗВІЛ Є · ПЕРЕЗАВАНТАЖ СТОРІНКУ';
+    else if (S.oriPerm === 'error') reason = 'НЕДОСТУПНО · ПОТРІБЕН HTTPS';
     else reason = 'НЕМАЄ ДАНИХ · ПЕРЕЗАВАНТАЖ / НЕМА СЕНСОРА';
     ctx.font = font(10.5, false); ctx.fillStyle = 'rgba(255,59,48,.88)';
     ctx.fillText(reason, L.cx, by + 45);
@@ -782,12 +791,6 @@ function drawTargets(now) {
   const d = S.det;
   if (!S.detOn) return;
   const conf = d.state.tracks.filter(T => T.status === 'TRK').sort((a, b) => b.conf - a.conf);
-
-  // сканувальна розгортка, коли підтверджених цілей нема
-  if (conf.length === 0 && !REDUCED) {
-    const a = L.att, sweep = a.x + ((now / 12) % a.w);
-    ctx.save(); ctx.globalAlpha = 0.28; ctx.beginPath(); ctx.moveTo(sweep, a.y); ctx.lineTo(sweep, a.y + a.h); stroke2(ctx, G, 1.4, false); ctx.restore();
-  }
 
   // авто-наведення: найближча до центру підтверджена ціль (якщо ручного лока нема)
   let designated = 0;
@@ -931,7 +934,7 @@ function fmt1(v) { return (v >= 0 ? '+' : '') + v.toFixed(1); }
 function refreshHUDText() {
   const giro = S.att.ok ? 'ОК' : 'НЕМА';
   let gpsTxt = S.gps.denied ? 'ВІДМОВА' : (gpsFresh() ? '±' + Math.round(S.gps.acc) + 'М' : 'ПОШУК…');
-  statusEl.textContent = 'PFD v11 · ' + VIS_LABEL[S.vis] + ' · ГІРО ' + giro + ' · HDG ' + S.hdg.mode + ' · GPS ' + gpsTxt + ' · Ц:' + S.det.count;
+  statusEl.textContent = 'PFD v12 · ' + VIS_LABEL[S.vis] + ' · ГІРО ' + giro + ' · HDG ' + S.hdg.mode + ' · GPS ' + gpsTxt + ' · Ц:' + S.det.count;
 
   if (S.gps.denied) { gpsChip.textContent = 'GPS: ВІДМОВА'; gpsChip.className = 'chip red'; }
   else if (gpsFresh()) { gpsChip.textContent = 'GPS: ±' + Math.round(S.gps.acc) + ' М'; gpsChip.className = 'chip'; }
@@ -1020,11 +1023,17 @@ async function waitOriEvent(ms) { const t0 = performance.now(); while (performan
 
 async function arm() {
   const btn = $('armBtn'); btn.disabled = true; S.armTs = performance.now();
-  audioInit(); if (AC && AC.state === 'suspended') { try { await AC.resume(); } catch (e) {} }
-
-  try { if (window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) { S.oriPerm = await DeviceOrientationEvent.requestPermission(); } else { S.oriPerm = 'granted'; } } catch (e) { S.oriPerm = 'error'; }
-  try { if (window.DeviceMotionEvent && DeviceMotionEvent.requestPermission) { S.motPerm = await DeviceMotionEvent.requestPermission(); } else { S.motPerm = 'granted'; } } catch (e) { S.motPerm = 'error'; }
+  // 1) ДОЗВІЛ НА ДАТЧИКИ — НАЙПЕРШЕ, поки активний жест користувача.
+  //    Обидва requestPermission ІНІЦІЮЄМО синхронно (ДО будь-якого await),
+  //    інакше iOS втрачає user-activation і гіроскоп лишається мертвим.
+  let _oriReq = null, _motReq = null;
+  try { if (window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) _oriReq = DeviceOrientationEvent.requestPermission(); } catch (e) { S.oriPerm = 'error'; }
+  try { if (window.DeviceMotionEvent && DeviceMotionEvent.requestPermission) _motReq = DeviceMotionEvent.requestPermission(); } catch (e) { S.motPerm = 'error'; }
+  S.oriPerm = _oriReq ? await _oriReq.then(v => v).catch(() => 'error') : (S.oriPerm === 'error' ? 'error' : 'granted');
+  S.motPerm = _motReq ? await _motReq.then(v => v).catch(() => 'error') : (S.motPerm === 'error' ? 'error' : 'granted');
   addSensorListeners();
+  // 2) аудіо — ПІСЛЯ датчиків (його await не має передувати requestPermission).
+  audioInit(); if (AC && AC.state === 'suspended') { try { await AC.resume(); } catch (e) {} }
 
   const l0 = bootLine('СИСТЕМА'); setLine(l0, 'ПАШЛА'); if (!REDUCED) await sleep(120);
 
@@ -1039,7 +1048,7 @@ async function arm() {
   if (!REDUCED) await sleep(100);
 
   const l3 = bootLine('ГІРОСКОП'); const got = await waitOriEvent(1300);
-  setLine(l3, got ? 'Є КОНТАКТ' : (S.oriPerm === 'denied' ? 'ДОЗВІЛ ВІДХИЛЕНО' : 'ТИША — ATT ФЛАГ'), got ? 'ok' : (S.oriPerm === 'denied' ? 'err' : 'warn'));
+  setLine(l3, got ? 'Є КОНТАКТ' : (S.oriPerm === 'denied' ? 'ДОЗВІЛ ВІДХИЛЕНО' : (S.oriPerm === 'granted' ? 'ТИША — ПЕРЕЗАВАНТАЖ' : 'ТИША — ATT ФЛАГ')), got ? 'ok' : (S.oriPerm === 'denied' ? 'err' : 'warn'));
 
   const l4 = bootLine('GPS'); startGPS(); setLine(l4, 'ШУКАЄМ СУПУТНИКИ…', 'warn'); if (!REDUCED) await sleep(100);
 
